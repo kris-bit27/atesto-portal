@@ -1,0 +1,35 @@
+-- CreateEnum
+CREATE TYPE "ContentStatus" AS ENUM ('DRAFT', 'PUBLISHED');
+
+-- CreateTable
+CREATE TABLE "Topic" (
+    "id" TEXT NOT NULL,
+    "title" TEXT NOT NULL,
+    "slug" TEXT NOT NULL,
+    "order" INTEGER NOT NULL DEFAULT 0,
+
+    CONSTRAINT "Topic_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "Question" (
+    "id" TEXT NOT NULL,
+    "topicId" TEXT NOT NULL,
+    "title" TEXT NOT NULL,
+    "slug" TEXT NOT NULL,
+    "status" "ContentStatus" NOT NULL DEFAULT 'DRAFT',
+    "contentHtml" TEXT NOT NULL DEFAULT '',
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "Question_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateIndex
+CREATE UNIQUE INDEX "Topic_slug_key" ON "Topic"("slug");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "Question_slug_key" ON "Question"("slug");
+
+-- AddForeignKey
+ALTER TABLE "Question" ADD CONSTRAINT "Question_topicId_fkey" FOREIGN KEY ("topicId") REFERENCES "Topic"("id") ON DELETE RESTRICT ON UPDATE CASCADE;

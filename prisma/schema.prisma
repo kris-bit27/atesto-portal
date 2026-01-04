@@ -1,0 +1,33 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Topic {
+  id        String     @id @default(cuid())
+  title     String
+  slug      String     @unique
+  order     Int        @default(0)
+  questions Question[]
+}
+
+model Question {
+  id          String        @id @default(cuid())
+  topicId     String
+  topic       Topic         @relation(fields: [topicId], references: [id])
+  title       String
+  slug        String        @unique
+  status      ContentStatus @default(DRAFT)
+  contentHtml String        @default("")
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+}
+
+enum ContentStatus {
+  DRAFT
+  PUBLISHED
+}

@@ -1,0 +1,201 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: #ffffff;
+  --foreground: #171717;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0a0a0a;
+    --foreground: #ededed;
+  }
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: Arial, Helvetica, sans-serif;
+}
+/* ====== C3: Typography pro čtení (read) ====== */
+.prose {
+  line-height: 1.7;
+  font-size: 16px;
+}
+
+.prose h1,
+.prose h2,
+.prose h3,
+.prose h4 {
+  margin: 18px 0 10px;
+  line-height: 1.2;
+}
+
+.prose h2 {
+  font-size: 22px;
+  border-bottom: 1px solid rgba(255,255,255,0.12);
+  padding-bottom: 8px;
+}
+
+.prose h3 {
+  font-size: 19px;
+}
+
+.prose p {
+  margin: 10px 0;
+  opacity: 0.98;
+}
+
+.prose ul,
+.prose ol {
+  margin: 10px 0 10px 22px;
+}
+
+.prose li {
+  margin: 6px 0;
+}
+
+.prose blockquote {
+  margin: 14px 0;
+  padding: 12px 14px;
+  border-left: 4px solid rgba(201,212,255,0.65);
+  background: rgba(255,255,255,0.05);
+  border-radius: 10px;
+  opacity: 0.98;
+}
+
+.prose code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: 0.95em;
+  padding: 2px 6px;
+  border-radius: 8px;
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.10);
+}
+
+.prose pre {
+  overflow: auto;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: rgba(255,255,255,0.07);
+  border: 1px solid rgba(255,255,255,0.10);
+}
+
+.prose a {
+  color: #c9d4ff;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.prose hr {
+  border: none;
+  border-top: 1px solid rgba(255,255,255,0.12);
+  margin: 16px 0;
+}
+
+.prose table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 14px 0;
+  overflow: hidden;
+  border-radius: 12px;
+  border: 1px solid rgba(255,255,255,0.10);
+}
+
+.prose th,
+.prose td {
+  padding: 10px 12px;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+  text-align: left;
+  vertical-align: top;
+}
+
+.prose th {
+  background: rgba(255,255,255,0.06);
+  font-weight: 700;
+}
+
+.prose tr:hover td {
+  background: rgba(255,255,255,0.04);
+}
+/* ====== C4: Print / PDF ====== */
+@media print {
+  /* Skryj věci, co nechceš v PDF */
+  .no-print {
+    display: none !important;
+  }
+
+  /* Zruš tmavé pozadí */
+  html, body {
+    background: #ffffff !important;
+    color: #000000 !important;
+  }
+
+  /* Prose v tisku */
+  .prose {
+    font-size: 12pt;
+    line-height: 1.45;
+    color: #000 !important;
+  }
+
+  .prose h1, .prose h2, .prose h3, .prose h4 {
+    color: #000 !important;
+    page-break-after: avoid;
+  }
+
+  .prose h2 {
+    border-bottom: 1px solid #ddd !important;
+  }
+
+  .prose a {
+    color: #000 !important;
+    text-decoration: underline;
+  }
+
+  /* Ať tabulky a bloky nejsou “useknuté” */
+  .prose table, .prose blockquote, .prose pre {
+    page-break-inside: avoid;
+  }
+
+  /* Card/boxy v tisku jako čistý list */
+  .print-card {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+  }
+}
+/* ---- TipTap basic styling ---- */
+.tiptap-editor {
+  padding: 14px;
+  min-height: 240px;
+  outline: none;
+  line-height: 1.7;
+}
+
+.tiptap-editor h2 { margin: 18px 0 10px; font-size: 20px; }
+.tiptap-editor h3 { margin: 14px 0 8px; font-size: 17px; }
+.tiptap-editor p { margin: 10px 0; }
+.tiptap-editor ul, .tiptap-editor ol { margin: 10px 0 10px 24px; }
+.tiptap-editor li { margin: 6px 0; }
+
+/* ---- Read page HTML rendering ---- */
+.print-card h2 { margin: 18px 0 10px; font-size: 20px; }
+.print-card h3 { margin: 14px 0 8px; font-size: 17px; }
+.print-card p { margin: 10px 0; }
+.print-card ul, .print-card ol { margin: 10px 0 10px 24px; }
+.print-card li { margin: 6px 0; }
+
+@media print {
+  body { background: #fff !important; }
+  .print-card { border: none !important; background: transparent !important; }
+}
+
+/* B1: responsive TOC - na užších obrazovkách se TOC schová (nebo půjde dolů) */
+@media (max-width: 900px) {
+  .hide-on-mobile {
+    display: none !important;
+  }
+}

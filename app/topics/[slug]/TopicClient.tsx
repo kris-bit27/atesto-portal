@@ -2,6 +2,7 @@
 
 import React, { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { FAV_KEY, loadFavSet, toggleFav, saveStringSet } from "@/app/lib/favorites";
 
 const READ_KEY = "atesto_read_slugs";
 
@@ -32,11 +33,19 @@ type Props = {
 export default function TopicClient({ questions, topicTitle }: Props) {
   const [query, setQuery] = useState("");
   const [onlyPublished, setOnlyPublished] = useState(true);
-  const [onlyUnread, setOnlyUnread] = useState(false);
+  
+  const [onlyFav, setOnlyFav] = useState(false);
+  const [favSet, setFavSet] = useState<Set<string>>(() => new Set());
+const [onlyUnread, setOnlyUnread] = useState(false);
 
   const [readSet, setReadSet] = useState<Set<string>>(new Set());
 
   useEffect(() => {
+  setFavSet(loadFavSet());
+
+  const onFavsUpdate = () => setFavSet(loadFavSet());
+  window.addEventListener("atesto-favs-updated", onFavsUpdate);
+  window.addEventListener("storage", onFavsUpdate);
     // initial load
     setReadSet(loadReadSet());
 
@@ -47,6 +56,8 @@ export default function TopicClient({ questions, topicTitle }: Props) {
     window.addEventListener("storage", onUpdate);
 
     return () => {
+    window.removeEventListener("atesto-favs-updated", onFavsUpdate);
+    window.removeEventListener("storage", onFavsUpdate);
       window.removeEventListener("atesto-read-updated", onUpdate as EventListener);
       window.removeEventListener("storage", onUpdate);
     };
@@ -69,7 +80,15 @@ export default function TopicClient({ questions, topicTitle }: Props) {
     return c;
   }, [questions, readSet]);
 
-  return (
+    const toggleFav = (slug: string) => {
+    const next = new Set(favSet);
+    if (next.has(slug)) next.delete(slug);
+    else next.add(slug);
+    setFavSet(next);
+    saveStringSet(FAV_KEY, next);
+  };
+
+return (
     <main style={{ display: "grid", gap: 12 }}>
       <h1 style={{ margin: 0 }}>{topicTitle}</h1>
 

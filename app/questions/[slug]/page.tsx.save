@@ -1,0 +1,46 @@
+import prisma from "@/lib/prisma";
+import EditorClient from "./EditorClient";
+
+export const dynamic = "force-dynamic";
+
+type PageProps = { params: { slug: string } };
+
+export default async function EditQuestionPage({ params }: PageProps) {
+  const q = await prisma.question.findUnique({
+    where: { slug: params.slug },
+    select: {
+      id: true,
+      slug: true,
+      title: true,
+      status: true,
+      contentHtml: true,
+      topic: {
+        select: {
+          slug: true,
+          title: true,
+        },
+      },
+    },
+  });
+
+  if (!q) {
+    return (
+      <main style={{ padding: 24 }}>
+        <h1>Otázka nenalezena</h1>
+        <p>Slug: {params.slug}</p>
+      </main>
+    );
+  }
+
+  return (
+    <main style={{ padding: 24, maxWidth: 980, margin: "0 auto" }}>
+      <EditorClient
+        
+        slug={q.slug}
+        
+        
+        initialHtml={q.contentHtml ?? ""}
+      />
+    </main>
+  );
+}
