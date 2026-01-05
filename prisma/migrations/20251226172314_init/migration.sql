@@ -18,7 +18,7 @@ CREATE TABLE "Question" (
     "title" TEXT NOT NULL,
     "slug" TEXT NOT NULL,
     "status" "ContentStatus" NOT NULL DEFAULT 'DRAFT',
-    "contentHtml" TEXT NOT NULL DEFAULT '',
+    "content" TEXT NOT NULL DEFAULT '',
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
 

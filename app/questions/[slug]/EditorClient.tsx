@@ -41,7 +41,7 @@ export default function EditorClient({ slug, initialTitle, initialStatus, initia
         body: JSON.stringify({
           title,
           status: nextStatus,
-          contentHtml: html,
+          content: html,
         }),
       });
 

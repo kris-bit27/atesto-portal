@@ -5,6 +5,7 @@ export const dynamic = "force-dynamic";
 
 type Params = { params: { slug: string } };
 
+// GET: vrací otázku pro editor/detail
 export async function GET(_req: Request, { params }: Params) {
   const q = await prisma.question.findUnique({
     where: { slug: params.slug },
@@ -12,50 +13,54 @@ export async function GET(_req: Request, { params }: Params) {
       slug: true,
       title: true,
       status: true,
-      content: true,
       contentHtml: true,
       updatedAt: true,
-    } as any,
+    },
   });
 
   if (!q) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  // sjednotíme, aby klient vždy dostal "contentHtml"
-  const contentHtml = (q as any).contentHtml ?? (q as any).content ?? "";
-
   return NextResponse.json({
     slug: q.slug,
     title: q.title ?? "",
-    status: (q as any).status ?? "DRAFT",
-    contentHtml,
+    status: q.status ?? "DRAFT",
+    // sjednocený název pro klienta
+    content: q.contentHtml ?? "",
     updatedAt: q.updatedAt,
   });
 }
 
+// PATCH: přijme změny z editoru a uloží do DB
 export async function PATCH(req: Request, { params }: Params) {
-  const body = await req.json().catch(() => ({}));
+  const body = await req.json().catch(() => ({} as any));
 
   const title = typeof body.title === "string" ? body.title : undefined;
-  const contentHtml = typeof body.contentHtml === "string" ? body.contentHtml : undefined;
+
+  // kompatibilita: klient může posílat buď "content" nebo "contentHtml"
+  const incomingContent =
+    typeof body.content === "string"
+      ? body.content
+      : typeof body.contentHtml === "string"
+        ? body.contentHtml
+        : undefined;
+
   const status = typeof body.status === "string" ? body.status : undefined;
 
-  // Update data – uložíme do contentHtml, pokud existuje ve schématu,
-  // jinak fallback do content
-  const data: any = {};
+  const data: {
+    title?: string;
+    status?: any;
+    contentHtml?: string;
+  } = {};
+
   if (title !== undefined) data.title = title;
   if (status !== undefined) data.status = status;
-
-  // zkusíme nejdřív contentHtml, když by padalo na DB úrovni, upravíme později
-  if (contentHtml !== undefined) {
-    data.contentHtml = contentHtml;
-    data.content = contentHtml; // fallback kompatibilita (pokud máš jen content)
-  }
+  if (incomingContent !== undefined) data.contentHtml = incomingContent;
 
   try {
     const updated = await prisma.question.update({
       where: { slug: params.slug },
       data,
-      select: { slug: true, title: true, status: true, updatedAt: true } as any,
+      select: { slug: true, title: true, status: true, updatedAt: true },
     });
 
     return NextResponse.json({ ok: true, updated });
