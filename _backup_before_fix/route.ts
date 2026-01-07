@@ -5,6 +5,7 @@ export const dynamic = "force-dynamic";
 
 type Params = { params: { slug: string } };
 
+// GET: vrací otázku pro editor/detail
 export async function GET(_req: Request, { params }: Params) {
   const q = await prisma.question.findUnique({
     where: { slug: params.slug },
@@ -23,23 +24,37 @@ export async function GET(_req: Request, { params }: Params) {
     slug: q.slug,
     title: q.title ?? "",
     status: q.status ?? "DRAFT",
-    contentHtml: q.contentHtml ?? "",
+    // sjednocený název pro klienta
+    content: q.contentHtml ?? "",
     updatedAt: q.updatedAt,
   });
 }
 
+// PATCH: přijme změny z editoru a uloží do DB
 export async function PATCH(req: Request, { params }: Params) {
   const body = await req.json().catch(() => ({} as any));
 
   const title = typeof body.title === "string" ? body.title : undefined;
-  const status = typeof body.status === "string" ? body.status : undefined;
-  const contentHtml =
-    typeof body.contentHtml === "string" ? body.contentHtml : undefined;
 
-  const data: { title?: string; status?: any; contentHtml?: string } = {};
+  // kompatibilita: klient může posílat buď "content" nebo "contentHtml"
+  const incomingContent =
+    typeof body.content === "string"
+      ? body.content
+      : typeof body.contentHtml === "string"
+        ? body.contentHtml
+        : undefined;
+
+  const status = typeof body.status === "string" ? body.status : undefined;
+
+  const data: {
+    title?: string;
+    status?: any;
+    contentHtml?: string;
+  } = {};
+
   if (title !== undefined) data.title = title;
   if (status !== undefined) data.status = status;
-  if (contentHtml !== undefined) data.contentHtml = contentHtml;
+  if (incomingContent !== undefined) data.contentHtml = incomingContent;
 
   try {
     const updated = await prisma.question.update({
