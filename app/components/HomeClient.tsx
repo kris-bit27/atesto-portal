@@ -3,30 +3,9 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import ReadBadgeClient from "@/app/components/read/ReadBadgeClient";
-import { FAV_KEY, loadStringSet, toggleFav, loadFavSet } from "@/app/lib/favorites";
+import { toggleFav, loadFavSet } from "@/app/lib/favorites";
 
 const READ_KEY = "atesto_read_slugs";
-const SRS_KEY = "atesto_srs_v1";
-
-function loadDueCount(): number {
-  if (typeof window === "undefined") return 0;
-  try {
-    const raw = window.localStorage.getItem(SRS_KEY);
-    if (!raw) return 0;
-    const obj = JSON.parse(raw);
-    if (!obj || typeof obj !== "object") return 0;
-    const now = Date.now();
-    let due = 0;
-    for (const k of Object.keys(obj)) {
-      const s = (obj as any)[k];
-      const dueAt = typeof s?.dueAt === "number" ? s.dueAt : 0;
-      if (dueAt === 0 || dueAt <= now) due += 1;
-    }
-    return due;
-  } catch {
-    return 0;
-  }
-}
 
 function loadReadSet(): Set<string> {
   if (typeof window === "undefined") return new Set();
@@ -50,31 +29,32 @@ type Props = {
 
 export default function HomeClient({ topics }: Props) {
   const [query, setQuery] = useState("");
-  
-  const [favSet, setFavSet] = useState<Set<string>>(new Set());
-const [onlyPublished, setOnlyPublished] = useState(true);
-  const [hideEmpty, setHideEmpty] = useState(false);
 
+  const [favSet, setFavSet] = useState<Set<string>>(new Set());
+  const [readSet, setReadSet] = useState<Set<string>>(new Set());
+
+  const [onlyPublished, setOnlyPublished] = useState(true);
+  const [hideEmpty, setHideEmpty] = useState(false);
   const [onlyFav, setOnlyFav] = useState(false);
-const [readSet, setReadSet] = useState<Set<string>>(new Set());
 
   useEffect(() => {
-  setFavSet(loadFavSet());
+    // favs
+    setFavSet(loadFavSet());
+    const onFavsUpdate = () => setFavSet(loadFavSet());
+    window.addEventListener("atesto-favs-updated", onFavsUpdate);
+    window.addEventListener("storage", onFavsUpdate);
 
-  const onFavsUpdate = () => setFavSet(loadFavSet());
-  window.addEventListener("atesto-favs-updated", onFavsUpdate);
-  window.addEventListener("storage", onFavsUpdate);
+    // read
     setReadSet(loadReadSet());
-
-    const onUpdate = () => setReadSet(loadReadSet());
-    window.addEventListener("atesto-read-updated", onUpdate);
-    window.addEventListener("storage", onUpdate);
+    const onReadUpdate = () => setReadSet(loadReadSet());
+    window.addEventListener("atesto-read-updated", onReadUpdate);
+    window.addEventListener("storage", onReadUpdate);
 
     return () => {
-    window.removeEventListener("atesto-favs-updated", onFavsUpdate);
-    window.removeEventListener("storage", onFavsUpdate);
-      window.removeEventListener("atesto-read-updated", onUpdate);
-      window.removeEventListener("storage", onUpdate);
+      window.removeEventListener("atesto-favs-updated", onFavsUpdate);
+      window.removeEventListener("storage", onFavsUpdate);
+      window.removeEventListener("atesto-read-updated", onReadUpdate);
+      window.removeEventListener("storage", onReadUpdate);
     };
   }, []);
 
@@ -99,15 +79,22 @@ const [readSet, setReadSet] = useState<Set<string>>(new Set());
     return { total, read, pct };
   }, [allQuestions, readSet]);
 
-  // topics pro zobrazení (filtr vyhledávání)
+  // topics pro zobrazení (filtry + meta)
   const filteredTopics = useMemo(() => {
     return topics
       .map((t) => {
-        const questions = t.questions.filter((it) => {
+        const all = t.questions ?? [];
+
+        const publishedAll = all.filter((x) => x.status === "PUBLISHED");
+        const readPublished = publishedAll.filter((x) => readSet.has(x.slug));
+        const favAll = all.filter((x) => favSet.has(x.slug));
+
+        const questions = all.filter((it) => {
           if (onlyPublished && it.status !== "PUBLISHED") return false;
-        if (onlyFav && !favSet.has(it.slug)) return false;
           if (onlyFav && !favSet.has(it.slug)) return false;
-if (!q) return true;
+
+          if (!q) return true;
+
           return (
             it.title.toLowerCase().includes(q) ||
             it.slug.toLowerCase().includes(q) ||
@@ -115,10 +102,20 @@ if (!q) return true;
             t.slug.toLowerCase().includes(q)
           );
         });
-        return { ...t, questions };
+
+        return {
+          ...t,
+          questions,
+          meta: {
+            totalAll: all.length,
+            publishedAll: publishedAll.length,
+            readPublished: readPublished.length,
+            favAll: favAll.length,
+          },
+        };
       })
-      .filter((t) => (hideEmpty ? t.questions.length > 0 : true));
-  }, [topics, onlyPublished, hideEmpty, q]);
+      .filter((t: any) => (hideEmpty ? t.questions.length > 0 : true));
+  }, [topics, onlyPublished, onlyFav, hideEmpty, q, favSet, readSet]);
 
   return (
     <main style={{ display: "grid", gap: 14 }}>
@@ -133,12 +130,19 @@ if (!q) return true;
             >
               READ
             </Link>
-              <Link
-                href="/review"
-                style={{ padding: "6px 10px", borderRadius: 999, border: "1px solid rgba(255,255,255,.2)" }}
-              >
-                REVIEW
-              </Link>
+            <Link
+              href="/review"
+              style={{ padding: "6px 10px", borderRadius: 999, border: "1px solid rgba(255,255,255,.2)" }}
+            >
+              REVIEW
+            </Link>
+            <Link
+              href="/search"
+              style={{ padding: "6px 10px", borderRadius: 999, border: "1px solid rgba(255,255,255,.2)" }}
+            >
+              SEARCH
+            </Link>
+
             <Link
               href="/editor"
               style={{ padding: "6px 10px", borderRadius: 999, border: "1px solid rgba(255,255,255,.2)" }}
@@ -198,6 +202,11 @@ if (!q) return true;
             </label>
 
             <label style={{ display: "flex", gap: 8, alignItems: "center" }}>
+              <input type="checkbox" checked={onlyFav} onChange={(e) => setOnlyFav(e.target.checked)} />
+              Jen ⭐
+            </label>
+
+            <label style={{ display: "flex", gap: 8, alignItems: "center" }}>
               <input type="checkbox" checked={hideEmpty} onChange={(e) => setHideEmpty(e.target.checked)} />
               Skrýt prázdná témata
             </label>
@@ -207,7 +216,7 @@ if (!q) return true;
 
       {/* TOPICS LIST */}
       <section style={{ display: "grid", gap: 14 }}>
-        {filteredTopics.map((t) => (
+        {filteredTopics.map((t: any) => (
           <div
             key={t.slug}
             style={{
@@ -219,11 +228,24 @@ if (!q) return true;
             }}
           >
             <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center" }}>
-              <div style={{ display: "grid" }}>
+              <div style={{ display: "grid", gap: 4 }}>
                 <strong>
                   {t.order}. {t.title}
                 </strong>
                 <span style={{ opacity: 0.65, fontSize: 12 }}>{t.slug}</span>
+
+                {/* PER-TOPIC META */}
+                <div style={{ display: "flex", gap: 12, flexWrap: "wrap", opacity: 0.85, fontSize: 12 }}>
+                  <span>
+                    Otázky: <b>{t.meta.publishedAll}</b>/<b>{t.meta.totalAll}</b> (PUBLISHED/ALL)
+                  </span>
+                  <span>
+                    Přečteno: <b>{t.meta.readPublished}</b>/<b>{t.meta.publishedAll}</b> (READ/PUBLISHED)
+                  </span>
+                  <span>
+                    ⭐: <b>{t.meta.favAll}</b>
+                  </span>
+                </div>
               </div>
 
               <Link
@@ -238,7 +260,7 @@ if (!q) return true;
               <div style={{ opacity: 0.7 }}>Žádné otázky (nebo skryté filtrem).</div>
             ) : (
               <div style={{ display: "grid", gap: 8 }}>
-                {t.questions.map((it) => (
+                {t.questions.map((it: Question) => (
                   <div
                     key={it.slug}
                     style={{
@@ -263,7 +285,13 @@ if (!q) return true;
                       <span style={{ opacity: 0.7, fontSize: 12 }}>{it.status}</span>
                       <button
                         onClick={() => toggleFav(it.slug)}
-                        style={{ padding: "6px 10px", borderRadius: 10, border: "1px solid rgba(255,255,255,.2)", background: "transparent" }}
+                        style={{
+                          padding: "6px 10px",
+                          borderRadius: 10,
+                          border: "1px solid rgba(255,255,255,.2)",
+                          background: "transparent",
+                          color: "inherit",
+                        }}
                       >
                         {favSet.has(it.slug) ? "★" : "☆"}
                       </button>
