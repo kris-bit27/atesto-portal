@@ -1,0 +1,177 @@
+"use client";
+
+import Link from "next/link";
+import { useEffect, useMemo, useState } from "react";
+import ReadBadgeClient from "@/app/components/read/ReadBadgeClient";
+import { loadFavSet } from "@/app/lib/favorites";
+
+const READ_KEY = "atesto_read_slugs";
+const SRS_KEY = "atesto_srs_v1";
+
+function loadReadSet(): Set<string> {
+  if (typeof window === "undefined") return new Set();
+  try {
+    const raw = window.localStorage.getItem(READ_KEY);
+    if (!raw) return new Set();
+    const arr = JSON.parse(raw);
+    if (!Array.isArray(arr)) return new Set();
+    return new Set(arr.filter((x) => typeof x === "string"));
+  } catch {
+    return new Set();
+  }
+}
+
+type Question = { slug: string; title: string; status: string };
+type Topic = { slug: string; title: string; order: number; questions: Question[] };
+
+type Props = {
+  topics: Topic[];
+};
+
+export default function HomeClient({ topics }: Props) {
+  const [readSet, setReadSet] = useState<Set<string>>(new Set());
+  const [favSet, setFavSet] = useState<Set<string>>(new Set());
+  const adminKey = process.env.NEXT_PUBLIC_ADMIN_KEY;
+
+  useEffect(() => {
+    setReadSet(loadReadSet());
+    setFavSet(loadFavSet());
+
+    const onUpdate = () => {
+      setReadSet(loadReadSet());
+      setFavSet(loadFavSet());
+    };
+
+    window.addEventListener("storage", onUpdate);
+    window.addEventListener("atesto-read-updated", onUpdate);
+    window.addEventListener("atesto-favs-updated", onUpdate);
+
+    return () => {
+      window.removeEventListener("storage", onUpdate);
+      window.removeEventListener("atesto-read-updated", onUpdate);
+      window.removeEventListener("atesto-favs-updated", onUpdate);
+    };
+  }, []);
+
+  const allQuestions = useMemo(() => {
+    const out: Question[] = [];
+    for (const t of topics) {
+      for (const q of t.questions) out.push(q);
+    }
+    return out;
+  }, [topics]);
+
+  const readCount = allQuestions.filter((q) => readSet.has(q.slug)).length;
+  const totalCount = allQuestions.length;
+  const pct = totalCount ? Math.round((readCount / totalCount) * 100) : 0;
+
+  return (
+    <main style={{ display: "grid", gap: 16 }}>
+      {/* HEADER */}
+      <header style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
+        <h1 style={{ margin: 0 }}>Atesto portál</h1>
+
+        <div style={{ display: "flex", gap: 10 }}>
+          <Link
+            href="/"
+            style={{ padding: "6px 10px", borderRadius: 999, border: "1px solid rgba(255,255,255,.2)" }}
+          >
+            READ
+          </Link>
+
+          <Link
+            href="/review"
+            style={{ padding: "6px 10px", borderRadius: 999, border: "1px solid rgba(255,255,255,.2)" }}
+          >
+            REVIEW
+          </Link>
+
+          {adminKey && (
+            <Link
+              href={`/admin?key=${encodeURIComponent(adminKey)}`}
+              style={{
+                padding: "6px 12px",
+                borderRadius: 999,
+                border: "1px solid rgba(255,255,255,.35)",
+                background: "rgba(255,255,255,.08)",
+                fontWeight: 600,
+              }}
+            >
+              ADMIN
+            </Link>
+          )}
+        </div>
+      </header>
+
+      {/* PROGRESS */}
+      <section
+        style={{
+          border: "1px solid rgba(255,255,255,.15)",
+          borderRadius: 14,
+          padding: 12,
+          display: "grid",
+          gap: 8,
+        }}
+      >
+        <div>
+          Přečteno <b>{readCount}</b> / <b>{totalCount}</b> ({pct}%)
+        </div>
+
+        <div
+          style={{
+            width: "100%",
+            height: 8,
+            borderRadius: 999,
+            border: "1px solid rgba(255,255,255,.18)",
+            overflow: "hidden",
+          }}
+        >
+          <div
+            style={{
+              width: `${pct}%`,
+              height: "100%",
+              background: "rgba(255,255,255,.35)",
+            }}
+          />
+        </div>
+      </section>
+
+      {/* TOPICS */}
+      <section style={{ display: "grid", gap: 14 }}>
+        {topics.map((t) => (
+          <div
+            key={t.slug}
+            style={{
+              border: "1px solid rgba(255,255,255,.12)",
+              borderRadius: 16,
+              padding: 12,
+              display: "grid",
+              gap: 10,
+            }}
+          >
+            <strong>
+              {t.order}. {t.title}
+            </strong>
+
+            {t.questions.map((q) => (
+              <div
+                key={q.slug}
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  padding: "6px 10px",
+                  borderRadius: 10,
+                  border: "1px solid rgba(255,255,255,.08)",
+                }}
+              >
+                <span>{q.title}</span>
+                <ReadBadgeClient slug={q.slug} />
+              </div>
+            ))}
+          </div>
+        ))}
+      </section>
+    </main>
+  );
+}

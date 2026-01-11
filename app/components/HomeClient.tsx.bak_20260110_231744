@@ -217,7 +217,7 @@ export default function HomeClient({ topics }: Props) {
                     </div>
                   </div>
 
-                  <Link className="atesto-btn atesto-btn-ghost" href={`/topics/${encodeURIComponent(t.slug)}`}>
+                  <Link className="atesto-btn atesto-btn-ghost" href={`/topics/${t.slug}`}>
                     Otevřít →
                   </Link>
                 </div>
@@ -229,7 +229,7 @@ export default function HomeClient({ topics }: Props) {
                 ) : (
                   <div className="atesto-qgrid">
                     {t.questions.map((it) => (
-                      <Link key={it.slug} className="atesto-qitem" href={`/questions/${encodeURIComponent(it.slug)}`}>
+                      <Link key={it.slug} className="atesto-qitem" href={`/questions/${it.slug}`}>
                         <div className="atesto-qitem-head">
                           <div className="atesto-qitem-title">{it.title}</div>
                           <span className={it.status === "PUBLISHED" ? "atesto-badge atesto-badge-ok" : "atesto-badge"}>

@@ -1,49 +1,72 @@
 import Link from "next/link";
 import prisma from "@/lib/prisma";
-import TopicClient from "./TopicClient";
 
 export const dynamic = "force-dynamic";
 
-type PageProps = { params: { slug: string } };
-
-export default async function TopicPage({ params }: PageProps) {
+export default async function Page({ params }: { params: { slug: string } }) {
   const topic = await prisma.topic.findUnique({
     where: { slug: params.slug },
     select: {
-      slug: true,
       title: true,
+      slug: true,
       order: true,
       questions: {
-        orderBy: { createdAt: "asc" },
-        select: { slug: true, title: true, status: true },
+        orderBy: { title: "asc" },
+        select: { slug: true, title: true, status: true, updatedAt: true },
       },
     },
   });
 
   if (!topic) {
     return (
-      <main style={{ padding: 20 }}>
-        <h1>Téma nenalezeno</h1>
-        <p>Slug: {params.slug}</p>
-        <Link href="/">← Zpět</Link>
+      <main className="atesto-container atesto-stack">
+        <div className="atesto-card">
+          <div className="atesto-card-inner">
+            <b>Téma nenalezeno.</b>
+            <div style={{ marginTop: 10 }}>
+              <Link className="atesto-btn" href="/">← Zpět</Link>
+            </div>
+          </div>
+        </div>
       </main>
     );
   }
 
   return (
-    <main style={{ display: "grid", gap: 12 }}>
-      <nav style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-        <Link href="/" style={{ opacity: 0.9 }}>
-          ← Témata
-        </Link>
-        <span style={{ opacity: 0.5 }}>/</span>
-        <span style={{ opacity: 0.9 }}>
-          {topic.order}. {topic.title}
-        </span>
-      </nav>
+    <main className="atesto-container atesto-stack">
+      <div className="atesto-card">
+        <div className="atesto-card-inner atesto-stack">
+          <div className="atesto-row" style={{ justifyContent: "space-between" }}>
+            <div>
+              <h1 className="atesto-h1" style={{ margin: 0 }}>
+                <span className="atesto-pill" style={{ marginRight: 10 }}>{topic.order}</span>
+                {topic.title}
+              </h1>
+              <div className="atesto-subtle">{topic.slug} • {topic.questions.length} otázek</div>
+            </div>
+            <Link className="atesto-btn" href="/">← Home</Link>
+          </div>
+        </div>
+      </div>
 
-      {/* Client část: filtry + progress + seznam */}
-      <TopicClient questions={topic.questions} topicTitle={`${topic.order}. ${topic.title}`} />
+      <div className="atesto-card">
+        <div className="atesto-card-inner atesto-stack">
+          {topic.questions.map((q) => (
+            <Link key={q.slug} className="atesto-qitem" href={`/questions/${encodeURIComponent(q.slug)}`}>
+              <div className="atesto-qitem-head">
+                <div className="atesto-qitem-title">{q.title}</div>
+                <span className={q.status === "PUBLISHED" ? "atesto-badge atesto-badge-ok" : "atesto-badge"}>
+                  {q.status}
+                </span>
+              </div>
+              <div className="atesto-qitem-sub">
+                <span className="atesto-subtle">{q.slug}</span>
+                <span className="atesto-subtle">upd: {new Date(q.updatedAt).toLocaleDateString()}</span>
+              </div>
+            </Link>
+          ))}
+        </div>
+      </div>
     </main>
   );
 }

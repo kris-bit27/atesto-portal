@@ -39,7 +39,6 @@ export default function AdminClient() {
   // create forms
   const [newTopic, setNewTopic] = useState({ title: "", slug: "", order: 0 });
   const [newQ, setNewQ] = useState({ topicId: "", title: "", slug: "", status: "DRAFT" });
-  const [filterTopicId, setFilterTopicId] = useState<string>("");
 
   // selected question (single editor)
   const [selectedId, setSelectedId] = useState<string>("");
@@ -102,11 +101,6 @@ export default function AdminClient() {
   }, [key]);
 
   const topicsById = useMemo(() => new Map(topics.map((t) => [t.id, t])), [topics]);
-
-  const filteredQuestions = useMemo(() => {
-    if (!filterTopicId) return questions;
-    return questions.filter((q) => q.topicId === filterTopicId);
-  }, [questions, filterTopicId]);
 
   return (
     <main className="atesto-container atesto-stack">
@@ -194,10 +188,10 @@ export default function AdminClient() {
           <div className="atesto-grid atesto-grid-questions">
             <select
               className="atesto-input"
-              value={filterTopicId}
-              onChange={(e) => setFilterTopicId(e.target.value)}
+              value={newQ.topicId}
+              onChange={(e) => setNewQ((s) => ({ ...s, topicId: e.target.value }))}
             >
-              <option value="">Všechny</option>
+              <option value="">Vyber téma…</option>
               {topics.map((t) => (
                 <option key={t.id} value={t.id}>
                   {t.order}. {t.title}
@@ -327,7 +321,7 @@ export default function AdminClient() {
               <div className="atesto-subtle">Seznam otázek (klikni Edit → otevře se editor nahoře)</div>
 
               <div className="atesto-stack">
-                {filteredQuestions.map((q) => (
+                {questions.map((q) => (
                   <div key={q.id} className="atesto-qitem" style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
                     <div style={{ display: "grid", gap: 4 }}>
                       <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>

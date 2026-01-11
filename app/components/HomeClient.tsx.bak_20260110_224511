@@ -7,11 +7,6 @@ import { loadFavSet } from "@/app/lib/favorites";
 
 const READ_KEY = "atesto_read_slugs";
 
-type Question = { slug: string; title: string; status: string };
-type Topic = { slug: string; title: string; order: number; questions: Question[] };
-
-type Props = { topics: Topic[] };
-
 function loadReadSet(): Set<string> {
   if (typeof window === "undefined") return new Set();
   try {
@@ -25,11 +20,16 @@ function loadReadSet(): Set<string> {
   }
 }
 
+type Question = { slug: string; title: string; status: string };
+type Topic = { slug: string; title: string; order: number; questions: Question[]; _count?: { questions: number } };
+
+type Props = { topics: Topic[] };
+
 export default function HomeClient({ topics }: Props) {
   const [query, setQuery] = useState("");
-  const [onlyPublished, setOnlyPublished] = useState(true);
-  const [onlyFav, setOnlyFav] = useState(false);
+  const [onlyPublished, setOnlyPublished] = useState(false);
   const [hideEmpty, setHideEmpty] = useState(false);
+  const [onlyFav, setOnlyFav] = useState(false);
 
   const [favSet, setFavSet] = useState<Set<string>>(new Set());
   const [readSet, setReadSet] = useState<Set<string>>(new Set());
@@ -39,14 +39,47 @@ export default function HomeClient({ topics }: Props) {
     setReadSet(loadReadSet());
 
     const onFavsUpdate = () => setFavSet(loadFavSet());
+    const onReadUpdate = () => setReadSet(loadReadSet());
+
     window.addEventListener("atesto-favs-updated", onFavsUpdate);
     window.addEventListener("storage", onFavsUpdate);
 
-    const onReadUpdate = () => setReadSet(loadReadSet());
     window.addEventListener("atesto-read-updated", onReadUpdate);
     window.addEventListener("storage", onReadUpdate);
 
-    return () => {
+    
+  // per-topic progress (respektuje onlyPublished + onlyFav filtry)
+  const topicProgress = useMemo(() => {
+    const map = new Map<string, { total: number; read: number }>();
+    for (const t of topics) {
+      let total = 0;
+      let read = 0;
+      for (const it of t.questions || []) {
+        if (onlyPublished && it.status !== "PUBLISHED") continue;
+        if (onlyFav && !favSet.has(it.slug)) continue;
+        total += 1;
+        if (readSet.has(it.slug)) read += 1;
+      }
+      map.set(t.slug, { total, read });
+    }
+    return map;
+  }, [topics, onlyPublished, onlyFav, favSet, readSet]);
+
+  // next unread question ("Continue reading")
+  const nextUnread = useMemo(() => {
+    for (const t of topics) {
+      for (const it of t.questions || []) {
+        if (onlyPublished && it.status !== "PUBLISHED") continue;
+        if (onlyFav && !favSet.has(it.slug)) continue;
+        if (!readSet.has(it.slug)) {
+          return { slug: it.slug, title: it.title, topicSlug: t.slug, topicTitle: t.title, order: t.order };
+        }
+      }
+    }
+    return null;
+  }, [topics, onlyPublished, onlyFav, favSet, readSet]);
+
+return () => {
       window.removeEventListener("atesto-favs-updated", onFavsUpdate);
       window.removeEventListener("storage", onFavsUpdate);
       window.removeEventListener("atesto-read-updated", onReadUpdate);
@@ -56,7 +89,6 @@ export default function HomeClient({ topics }: Props) {
 
   const q = query.trim().toLowerCase();
 
-  // Flatten všech otázek podle filtrů (pro globální progress)
   const allQuestions = useMemo(() => {
     const out: Question[] = [];
     for (const t of topics) {
@@ -75,6 +107,30 @@ export default function HomeClient({ topics }: Props) {
     const pct = total > 0 ? Math.round((read / total) * 100) : 0;
     return { total, read, pct };
   }, [allQuestions, readSet]);
+
+  const filteredTopics = useMemo(() => {
+    return topics
+      .map((topic) => {
+        const questions = topic.questions.filter((it) => {
+          if (onlyPublished && it.status !== "PUBLISHED") return false;
+          if (onlyFav && !favSet.has(it.slug)) return false;
+
+          if (!q) return true;
+
+          const qq = q;
+          return (
+            it.title.toLowerCase().includes(qq) ||
+            it.slug.toLowerCase().includes(qq) ||
+            topic.title.toLowerCase().includes(qq) ||
+            topic.slug.toLowerCase().includes(qq)
+          );
+        });
+
+        return { ...topic, questions };
+      })
+      .filter((topic) => (hideEmpty ? topic.questions.length > 0 : true));
+  }, [topics, onlyPublished, hideEmpty, q, onlyFav, favSet]);
+
 
   // per-topic progress (respektuje onlyPublished + onlyFav)
   const topicProgress = useMemo(() => {
@@ -107,40 +163,16 @@ export default function HomeClient({ topics }: Props) {
     return null;
   }, [topics, onlyPublished, onlyFav, favSet, readSet]);
 
-  // topics pro zobrazení (filtr vyhledávání)
-  const filteredTopics = useMemo(() => {
-    return topics
-      .map((topic) => {
-        const questions = (topic.questions || []).filter((it) => {
-          if (onlyPublished && it.status !== "PUBLISHED") return false;
-          if (onlyFav && !favSet.has(it.slug)) return false;
-
-          if (!q) return true;
-
-          return (
-            it.title.toLowerCase().includes(q) ||
-            it.slug.toLowerCase().includes(q) ||
-            topic.title.toLowerCase().includes(q) ||
-            topic.slug.toLowerCase().includes(q)
-          );
-        });
-        return { ...topic, questions };
-      })
-      .filter((topic) => (hideEmpty ? topic.questions.length > 0 : true));
-  }, [topics, onlyPublished, hideEmpty, q, onlyFav, favSet]);
 
   return (
     <main className="atesto-container atesto-stack">
       <header className="atesto-card">
         <div className="atesto-card-head">
-          <h1 className="atesto-h1" style={{ marginBottom: 6 }}>
-            Atesto portál
-          </h1>
+          <h1 className="atesto-h1" style={{ marginBottom: 6 }}>Atesto portál</h1>
           <div className="atesto-subtle">Učení podle témat • progress • rychlé vyhledávání</div>
         </div>
 
         <div className="atesto-card-inner atesto-stack">
-          {/* GLOBAL PROGRESS */}
           <div className="atesto-progress">
             <div className="atesto-progress-row">
               <div>
@@ -151,27 +183,6 @@ export default function HomeClient({ topics }: Props) {
               </div>
             </div>
 
-            {/* CONTINUE READING */}
-            {nextUnread ? (
-              <div className="atesto-continue">
-                <div className="atesto-subtle" style={{ marginBottom: 6 }}>
-                  Continue reading
-                </div>
-                <div className="atesto-continue-row">
-                  <div>
-                    <div style={{ fontWeight: 700 }}>{nextUnread.title}</div>
-                    <div className="atesto-subtle" style={{ marginTop: 2 }}>
-                      {nextUnread.order}. {nextUnread.topicTitle}
-                    </div>
-                  </div>
-                  <Link className="atesto-btn" href={`/questions/${nextUnread.slug}`}>
-                    Pokračovat →
-                  </Link>
-                </div>
-              </div>
-            ) : null}
-
-            {/* FILTERS */}
             <div className="atesto-filters">
               <input
                 className="atesto-input"
@@ -199,55 +210,47 @@ export default function HomeClient({ topics }: Props) {
         </div>
       </header>
 
-      {/* TOPICS LIST */}
       <section className="atesto-stack">
-        {filteredTopics.map((t) => {
-          const tp = topicProgress.get(t.slug) || { total: 0, read: 0 };
-          return (
-            <div key={t.slug} className="atesto-card">
-              <div className="atesto-card-inner">
-                <div className="atesto-topic-row">
-                  <div className="atesto-topic-left">
-                    <div className="atesto-topic-title">
-                      <span className="atesto-pill">{t.order}</span>
-                      <strong>{t.title}</strong>
-                    </div>
-                    <div className="atesto-subtle">
-                      {t.slug} • {tp.read}/{tp.total} přečteno
-                    </div>
+        {filteredTopics.map((t) => (
+          <div key={t.slug} className="atesto-card">
+            <div className="atesto-card-inner">
+              <div className="atesto-topic-row">
+                <div className="atesto-topic-left">
+                  <div className="atesto-topic-title">
+                    <span className="atesto-pill">{t.order}</span>
+                    <strong>{t.title}</strong>
                   </div>
-
-                  <Link className="atesto-btn atesto-btn-ghost" href={`/topics/${encodeURIComponent(t.slug)}`}>
-                    Otevřít →
-                  </Link>
+                  <div className="atesto-subtle">{t.slug} • {topicProgress.get(t.slug)?.read ?? 0}/{topicProgress.get(t.slug)?.total ?? 0} přečteno</div>
                 </div>
 
-                {(t.questions || []).length === 0 ? (
-                  <div className="atesto-subtle" style={{ marginTop: 8 }}>
-                    Žádné otázky (nebo skryté filtrem).
-                  </div>
-                ) : (
-                  <div className="atesto-qgrid">
-                    {t.questions.map((it) => (
-                      <Link key={it.slug} className="atesto-qitem" href={`/questions/${encodeURIComponent(it.slug)}`}>
-                        <div className="atesto-qitem-head">
-                          <div className="atesto-qitem-title">{it.title}</div>
-                          <span className={it.status === "PUBLISHED" ? "atesto-badge atesto-badge-ok" : "atesto-badge"}>
-                            {it.status}
-                          </span>
-                        </div>
-                        <div className="atesto-qitem-sub">
-                          <span className="atesto-subtle">{it.slug}</span>
-                          <ReadBadgeClient slug={it.slug} />
-                        </div>
-                      </Link>
-                    ))}
-                  </div>
-                )}
+                <Link className="atesto-btn atesto-btn-ghost" href={`/topics/${t.slug}`}>
+                  Otevřít →
+                </Link>
               </div>
+
+              {(t.questions || []).length === 0 ? (
+                <div className="atesto-subtle" style={{ marginTop: 8 }}>Žádné otázky (nebo skryté filtrem).</div>
+              ) : (
+                <div className="atesto-qgrid">
+                  {t.questions.map((it) => (
+                    <Link key={it.slug} className="atesto-qitem" href={`/questions/${it.slug}`}>
+                      <div className="atesto-qitem-head">
+                        <div className="atesto-qitem-title">{it.title}</div>
+                        <span className={it.status === "PUBLISHED" ? "atesto-badge atesto-badge-ok" : "atesto-badge"}>
+                          {it.status}
+                        </span>
+                      </div>
+                      <div className="atesto-qitem-sub">
+                        <span className="atesto-subtle">{it.slug}</span>
+                        <ReadBadgeClient slug={it.slug} />
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+              )}
             </div>
-          );
-        })}
+          </div>
+        ))}
       </section>
     </main>
   );

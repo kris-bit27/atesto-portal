@@ -90,6 +90,19 @@ export default async function QuestionPage({ params }: Params) {
         </div>
       </section>
 
+      {/* NAV (bottom) */}
+      <footer className="atesto-card">
+        <div className="atesto-card-inner" style={{ display: "flex", justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+            {q.topic?.slug ? <NavButton href={`/topics/${q.topic.slug}`} label="← Zpět na téma" /> : <NavButton href="/" label="← Home" />}
+          </div>
+
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+            {prev ? <NavButton href={`/questions/${prev.slug}`} label={`← Prev: ${prev.title}`} /> : null}
+            {next ? <NavButton href={`/questions/${next.slug}`} label={`Next: ${next.title} →`} /> : null}
+          </div>
+        </div>
+      </footer>
     </main>
   );
 }

@@ -1,0 +1,80 @@
+"use client";
+
+import Link from "next/link";
+import { useEffect, useMemo, useState } from "react";
+import { listDue, markReviewed, removeFromReview, SRS_KEY } from "@/app/lib/srs";
+
+export default function ReviewClient() {
+  const [due, setDue] = useState<string[]>([]);
+
+  useEffect(() => {
+    const refresh = () => setDue(listDue());
+    refresh();
+    window.addEventListener("atesto-srs-updated", refresh);
+    window.addEventListener("storage", refresh);
+    return () => {
+      window.removeEventListener("atesto-srs-updated", refresh);
+      window.removeEventListener("storage", refresh);
+    };
+  }, []);
+
+  const count = due.length;
+
+  const rawAll = useMemo(() => {
+    try {
+      const raw = window.localStorage.getItem(SRS_KEY);
+      if (!raw) return {};
+      return JSON.parse(raw) || {};
+    } catch {
+      return {};
+    }
+  }, [count]);
+
+  if (count === 0) {
+    return (
+      <div className="atesto-card">
+        <div className="atesto-card-inner">
+          <div className="atesto-subtle">Nemáš nic “due”. Přidej si otázky do review v detailu otázky.</div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="atesto-card">
+      <div className="atesto-card-inner atesto-stack">
+        <div className="atesto-row" style={{ justifyContent: "space-between" }}>
+          <div>
+            <b>Due: {count}</b>
+            <div className="atesto-subtle">Klikni na otázku → zopakuj → “Hotovo”</div>
+          </div>
+        </div>
+
+        <div className="atesto-stack">
+          {due.map((slug) => (
+            <div key={slug} className="atesto-qitem" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div style={{ display: "grid", gap: 4 }}>
+                <div><b>{slug}</b></div>
+                <div className="atesto-subtle">interval/due info je v localStorage</div>
+              </div>
+
+              <div className="atesto-row">
+                <Link className="atesto-btn" href={`/questions/${slug}`}>Otevřít</Link>
+                <button className="atesto-btn atesto-btn-primary" onClick={() => { markReviewed(slug); setDue(listDue()); }}>
+                  Hotovo
+                </button>
+                <button className="atesto-btn atesto-btn-danger" onClick={() => { removeFromReview(slug); setDue(listDue()); }}>
+                  Odebrat
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div className="atesto-subtle">
+          Pozn.: v další verzi doplníme název otázky z DB (teď je to MVP “slug-first”).
+        </div>
+      </div>
+    </div>
+  );
+}

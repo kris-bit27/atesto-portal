@@ -1,0 +1,417 @@
+"use client";
+
+import Link from "next/link";
+import { useEffect, useMemo, useState } from "react";
+import TiptapEditor from "@/app/admin/components/TiptapEditor";
+
+type Topic = { id: string; title: string; slug: string; order: number; _count?: { questions: number } };
+type Question = {
+  id: string;
+  topicId: string;
+  title: string;
+  slug: string;
+  status: string;
+  contentHtml: string;
+  updatedAt: string;
+  topic?: { id: string; title: string; slug: string; order: number };
+};
+
+function getKey() {
+  if (typeof window === "undefined") return "";
+  const p = new URLSearchParams(window.location.search);
+  return p.get("key") || "";
+}
+
+export default function AdminClient() {
+  const [key, setKey] = useState("");
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+    try {
+      const p = new URLSearchParams(window.location.search);
+      setKey(p.get("key") || "");
+    } catch {
+      setKey("");
+    }
+  }, []);
+
+  const [err, setErr] = useState<string>("");
+  const [loading, setLoading] = useState(false);
+
+  const [topics, setTopics] = useState<Topic[]>([]);
+  const [questions, setQuestions] = useState<Question[]>([]);
+
+  const onError = (e: any) => {
+    const msg = typeof e === "string" ? e : (e?.message || "Chyba");
+    setErr(msg);
+    try { console.error("[ADMIN ERROR]", e); } catch {}
+  };
+
+  // create forms
+  const [newTopic, setNewTopic] = useState({ title: "", slug: "", order: 0 });
+  const [newQ, setNewQ] = useState({ topicId: "", title: "", slug: "", status: "DRAFT" });
+
+  async function api<T>(path: string, init?: RequestInit): Promise<T> {
+    const url = path.includes("?") ? `${path}&key=${encodeURIComponent(key)}` : `${path}?key=${encodeURIComponent(key)}`;
+    const res = await fetch(url, {
+      ...init,
+      headers: { "content-type": "application/json", ...(init?.headers || {}) },
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data?.error || `HTTP ${res.status}`);
+    return data as T;
+  }
+
+  async function loadAll() {
+    setLoading(true);
+    setErr("");
+    try {
+      const t = await api<{ topics: Topic[] }>("/api/admin/topics");
+      setTopics(t.topics || []);
+      const q = await api<{ questions: Question[] }>("/api/admin/questions");
+      setQuestions(q.questions || []);
+    } catch (e: any) {
+      onError(e);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    if (!key) setErr("Chybí ?key=... (např. /admin?key=TVŮJ_KLÍČ)");
+    else loadAll();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key]);
+
+  const topicsById = useMemo(() => new Map(topics.map((t) => [t.id, t])), [topics]);
+
+  return (
+    <main className="atesto-container atesto-grid">
+      <header className="atesto-header">
+        <h1 className="atesto-title">Admin</h1>
+        <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+          <Link href="/" style={{ padding: "6px 10px", borderRadius: 999, border: "1px solid rgba(255,255,255,.2)" , cursor: "pointer", pointerEvents: "auto" }}>
+            ← Zpět
+          </Link>
+          <button type="button"
+            onClick={loadAll}
+            style={{ padding: "8px 12px", borderRadius: 12, border: "1px solid rgba(255,255,255,.2)", background: "transparent", color: "inherit" , cursor: "pointer", pointerEvents: "auto" }}
+          >
+            Reload
+          </button>
+          <span style={{ opacity: 0.7, fontSize: 12 }}>{mounted ? (key ? "key: OK" : "key: MISSING") : ""}</span>
+        </div>
+      </header>
+
+      {err ? (
+        <div style={{ border: "1px solid rgba(255,80,80,.5)", borderRadius: 14, padding: 12 , cursor: "pointer", pointerEvents: "auto" }}>
+          <b>Chyba:</b> {err}
+        </div>
+      ) : null}
+
+      {/* TOPICS */}
+      <section style={{ border: "1px solid rgba(255,255,255,.12)", borderRadius: 16, padding: 12, display: "grid", gap: 12 , cursor: "pointer", pointerEvents: "auto" }}>
+        <h2 style={{ margin: 0 }}>Témata ({topics.length})</h2>
+
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 120px 140px", gap: 8 }}>
+          <input
+            placeholder="title"
+            value={newTopic.title}
+            onChange={(e) => setNewTopic((s) => ({ ...s, title: e.target.value }))}
+            style={{ padding: 10, borderRadius: 10, border: "1px solid rgba(255,255,255,.2)", background: "transparent", color: "inherit" , cursor: "pointer", pointerEvents: "auto" }}
+          />
+          <input
+            placeholder="slug"
+            value={newTopic.slug}
+            onChange={(e) => setNewTopic((s) => ({ ...s, slug: e.target.value }))}
+            style={{ padding: 10, borderRadius: 10, border: "1px solid rgba(255,255,255,.2)", background: "transparent", color: "inherit" , cursor: "pointer", pointerEvents: "auto" }}
+          />
+          <input
+            placeholder="order"
+            type="number"
+            value={newTopic.order}
+            onChange={(e) => setNewTopic((s) => ({ ...s, order: Number(e.target.value || 0) }))}
+            style={{ padding: 10, borderRadius: 10, border: "1px solid rgba(255,255,255,.2)", background: "transparent", color: "inherit" , cursor: "pointer", pointerEvents: "auto" }}
+          />
+          <button type="button"
+            disabled={loading}
+            onClick={async () => {
+              try {
+                await api("/api/admin/topics", { method: "POST", body: JSON.stringify(newTopic) });
+                setNewTopic({ title: "", slug: "", order: 0 });
+                await loadAll();
+              } catch (e: any) {
+                setErr(e?.message || "Chyba");
+              }
+            }}
+            style={{ padding: "10px 12px", borderRadius: 10, border: "1px solid rgba(255,255,255,.2)", background: "rgba(255,255,255,.06)", color: "inherit" , cursor: "pointer", pointerEvents: "auto" }}
+          >
+            + Přidat téma
+          </button>
+        </div>
+
+        <div style={{ display: "grid", gap: 8 }}>
+          {topics.map((t) => (
+            <TopicRow key={t.id} t={t} loading={loading} api={api} onDone={loadAll} onError={onError} />
+          ))}
+        </div>
+      </div></section>
+
+      {/* QUESTIONS */}
+      <section style={{ border: "1px solid rgba(255,255,255,.12)", borderRadius: 16, padding: 12, display: "grid", gap: 12 , cursor: "pointer", pointerEvents: "auto" }}>
+        <h2 style={{ margin: 0 }}>Otázky ({questions.length})</h2>
+
+        <div style={{ display: "grid", gridTemplateColumns: "220px 1fr 1fr 140px 140px", gap: 8 }}>
+          <select
+            value={newQ.topicId}
+            onChange={(e) => setNewQ((s) => ({ ...s, topicId: e.target.value }))}
+            style={{ padding: 10, borderRadius: 10, border: "1px solid rgba(255,255,255,.2)", background: "transparent", color: "inherit" , cursor: "pointer", pointerEvents: "auto" }}
+          >
+            <option value="">Vyber téma…</option>
+            {topics.map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.order}. {t.title}
+              </option>
+            ))}
+          </select>
+
+          <input
+            placeholder="title"
+            value={newQ.title}
+            onChange={(e) => setNewQ((s) => ({ ...s, title: e.target.value }))}
+            style={{ padding: 10, borderRadius: 10, border: "1px solid rgba(255,255,255,.2)", background: "transparent", color: "inherit" , cursor: "pointer", pointerEvents: "auto" }}
+          />
+          <input
+            placeholder="slug"
+            value={newQ.slug}
+            onChange={(e) => setNewQ((s) => ({ ...s, slug: e.target.value }))}
+            style={{ padding: 10, borderRadius: 10, border: "1px solid rgba(255,255,255,.2)", background: "transparent", color: "inherit" , cursor: "pointer", pointerEvents: "auto" }}
+          />
+          <select
+            value={newQ.status}
+            onChange={(e) => setNewQ((s) => ({ ...s, status: e.target.value }))}
+            style={{ padding: 10, borderRadius: 10, border: "1px solid rgba(255,255,255,.2)", background: "transparent", color: "inherit" , cursor: "pointer", pointerEvents: "auto" }}
+          >
+            <option value="DRAFT">DRAFT</option>
+            <option value="PUBLISHED">PUBLISHED</option>
+          </select>
+
+          <button type="button"
+            disabled={loading}
+            onClick={async () => {
+              try {
+                await api("/api/admin/questions", { method: "POST", body: JSON.stringify({ ...newQ, contentHtml: "" }) });
+                setNewQ({ topicId: "", title: "", slug: "", status: "DRAFT" });
+                await loadAll();
+              } catch (e: any) {
+                setErr(e?.message || "Chyba");
+              }
+            }}
+            style={{ padding: "10px 12px", borderRadius: 10, border: "1px solid rgba(255,255,255,.2)", background: "rgba(255,255,255,.06)", color: "inherit" , cursor: "pointer", pointerEvents: "auto" }}
+          >
+            + Přidat otázku
+          </button>
+        </div>
+
+        <div style={{ display: "grid", gap: 10 }}>
+          {questions.map((q) => (
+            <QuestionCard
+              key={q.id}
+              q={q}
+              topicTitle={topicsById.get(q.topicId)?.title || q.topic?.title || ""}
+              topics={topics}
+              loading={loading}
+              api={api}
+              onDone={loadAll}
+      onError={(e: any) => setErr(e?.message || "Chyba")}
+              keyStr={key}
+            />
+          ))}
+        </div>
+      </div></section>
+    </main>
+  );
+}
+
+function TopicRow({ t, api, onDone, loading, onError }: { t: Topic; api: any; onDone: () => Promise<void>; loading: boolean; onError: (e:any)=>void }) {
+  const [draft, setDraft] = useState({ title: t.title, slug: t.slug, order: t.order });
+
+  return (
+    <div style={{ border: "1px solid rgba(255,255,255,.10)", borderRadius: 12, padding: 10, display: "grid", gap: 8 , cursor: "pointer", pointerEvents: "auto" }}>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 120px 220px", gap: 8, alignItems: "center" }}>
+        <input value={draft.title} onChange={(e) => setDraft((s) => ({ ...s, title: e.target.value }))} style={{ padding: 10, borderRadius: 10, border: "1px solid rgba(255,255,255,.2)", background: "transparent", color: "inherit" , cursor: "pointer", pointerEvents: "auto" }} />
+        <input value={draft.slug} onChange={(e) => setDraft((s) => ({ ...s, slug: e.target.value }))} style={{ padding: 10, borderRadius: 10, border: "1px solid rgba(255,255,255,.2)", background: "transparent", color: "inherit" , cursor: "pointer", pointerEvents: "auto" }} />
+        <input type="number" value={draft.order} onChange={(e) => setDraft((s) => ({ ...s, order: Number(e.target.value || 0) }))} style={{ padding: 10, borderRadius: 10, border: "1px solid rgba(255,255,255,.2)", background: "transparent", color: "inherit" , cursor: "pointer", pointerEvents: "auto" }} />
+        <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", position: "relative", zIndex: 50 }}>
+          <span style={{ opacity: 0.65, fontSize: 12, alignSelf: "center" }}>Q: {t._count?.questions ?? "?"}</span>
+          <button type="button"
+            disabled={loading}
+            onClick={async () => {
+              try {
+                await api(`/api/admin/topics/${t.id}`, { method: "PATCH", body: JSON.stringify(draft) });
+                await onDone();
+              } catch (e: any) {
+                onError(e);
+              }
+            }}
+            style={{ padding: "8px 10px", borderRadius: 10, border: "1px solid rgba(255,255,255,.2)", background: "transparent", color: "inherit" , cursor: "pointer", pointerEvents: "auto" }}
+          >
+            Uložit
+          </button>
+          <button type="button"
+            disabled={loading}
+            onClick={async () => {
+              try {
+                if (!confirm("Smazat téma? (musí být bez otázek)")) return;
+                await api(`/api/admin/topics/${t.id}`, { method: "DELETE" });
+                await onDone();
+              } catch (e: any) {
+                onError(e);
+              }
+            }}
+            style={{ padding: "8px 10px", borderRadius: 10, border: "1px solid rgba(255,80,80,.35)", background: "transparent", color: "inherit" , cursor: "pointer", pointerEvents: "auto" }}
+          >
+            Smazat
+          </button>
+        </div>
+      </div>
+      <div style={{ opacity: 0.6, fontSize: 12 }}>id: {t.id}</div>
+    </div>
+  );
+}
+
+function QuestionCard({
+  q,
+  topics,
+  topicTitle,
+  keyStr,
+  api,
+  onDone,
+  loading,
+  onError,}: {
+  q: Question;
+  topics: Topic[];
+  topicTitle: string;
+  keyStr: string;
+  api: any;
+  onDone: () => Promise<void>;
+  loading: boolean;
+  onError: (e:any)=>void;
+}) {
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (!saving) return;
+    const t = setTimeout(() => setSaving(false), 8000);
+    return () => clearTimeout(t);
+  }, [saving]);
+
+
+  const [draft, setDraft] = useState({
+    topicId: q.topicId,
+    title: q.title,
+    slug: q.slug,
+    status: q.status,
+    contentHtml: q.contentHtml || "",
+  });
+
+  return (
+    <div style={{ border: "1px solid rgba(255,255,255,.10)", borderRadius: 12, padding: 12, display: "grid", gap: 10 , cursor: "pointer", pointerEvents: "auto" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center" }}>
+        <div style={{ display: "grid" }}>
+          <b>{draft.title}</b>
+          <span style={{ opacity: 0.65, fontSize: 12 }}>
+            {topicTitle} • {draft.status} • updated: {new Date(q.updatedAt).toLocaleString()}
+          </span>
+        </div>
+        <div style={{ display: "flex", gap: 8, position: "relative", zIndex: 50 }}>
+          <Link
+            href={`/questions/${q.slug}`}
+            style={{ padding: "8px 10px", borderRadius: 10, border: "1px solid rgba(255,255,255,.2)" , cursor: "pointer", pointerEvents: "auto" }}
+          >
+            Otevřít
+          </Link>
+          <button type="button"
+            disabled={loading || saving}
+            onClick={async () => {
+              try {
+                setSaving(true);
+                console.log("[ADMIN] save click", q.id);
+                await api(`/api/admin/questions/${q.id}`, { method: "PATCH", body: JSON.stringify(draft) });
+                await onDone();
+              } catch (e: any) {
+                onError(e);
+              } finally {
+                setSaving(false);
+              }
+            }}
+            style={{ padding: "8px 10px", borderRadius: 10, border: "1px solid rgba(255,255,255,.2)", background: "transparent", color: "inherit" , cursor: "pointer", pointerEvents: "auto" }}
+          >
+            Uložit
+          </button>
+          <button type="button"
+            disabled={loading || saving}
+            onClick={async () => {
+              try {
+                if (!confirm("Smazat otázku?")) return;
+                setSaving(true);
+                await api(`/api/admin/questions/${q.id}`, { method: "DELETE" });
+                await onDone();
+              } catch (e: any) {
+                onError(e);
+              } finally {
+                setSaving(false);
+              }
+            }}
+            style={{ padding: "8px 10px", borderRadius: 10, border: "1px solid rgba(255,80,80,.35)", background: "transparent", color: "inherit" , cursor: "pointer", pointerEvents: "auto" }}
+          >
+            Smazat
+          </button>
+        </div>
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "220px 1fr 1fr 160px", gap: 8 }}>
+        <select
+          value={draft.topicId}
+          onChange={(e) => setDraft((s) => ({ ...s, topicId: e.target.value }))}
+          style={{ padding: 10, borderRadius: 10, border: "1px solid rgba(255,255,255,.2)", background: "transparent", color: "inherit" , cursor: "pointer", pointerEvents: "auto" }}
+        >
+          {topics.map((t) => (
+            <option key={t.id} value={t.id}>
+              {t.order}. {t.title}
+            </option>
+          ))}
+        </select>
+
+        <input
+          value={draft.title}
+          onChange={(e) => setDraft((s) => ({ ...s, title: e.target.value }))}
+          style={{ padding: 10, borderRadius: 10, border: "1px solid rgba(255,255,255,.2)", background: "transparent", color: "inherit" , cursor: "pointer", pointerEvents: "auto" }}
+        />
+
+        <input
+          value={draft.slug}
+          onChange={(e) => setDraft((s) => ({ ...s, slug: e.target.value }))}
+          style={{ padding: 10, borderRadius: 10, border: "1px solid rgba(255,255,255,.2)", background: "transparent", color: "inherit" , cursor: "pointer", pointerEvents: "auto" }}
+        />
+
+        <select
+          value={draft.status}
+          onChange={(e) => setDraft((s) => ({ ...s, status: e.target.value }))}
+          style={{ padding: 10, borderRadius: 10, border: "1px solid rgba(255,255,255,.2)", background: "transparent", color: "inherit" , cursor: "pointer", pointerEvents: "auto" }}
+        >
+          <option value="DRAFT">DRAFT</option>
+          <option value="PUBLISHED">PUBLISHED</option>
+        </select>
+      </div>
+
+      {/* WYSIWYG */}
+      <TiptapEditor
+        value={draft.contentHtml}
+        onChange={(html) => setDraft((s) => ({ ...s, contentHtml: html }))}
+        placeholder="Piš obsah… (TipTap)"
+      />
+    </div>
+  );
+}

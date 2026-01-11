@@ -1,0 +1,68 @@
+import { PrismaClient } from "@prisma/client";
+
+const prisma = new PrismaClient();
+
+function slugify(input: string) {
+  return input
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")     // pryč diakritika
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")         // mezery + znaky -> -
+    .replace(/^-+|-+$/g, "")             // trim -
+    .replace(/--+/g, "-");               // vícenásobné -
+}
+
+async function main() {
+  console.log("🌱 Seeduji Atesto portál (clean slugs)…");
+
+  await prisma.question.deleteMany();
+  await prisma.topic.deleteMany();
+
+  const topicA1 = await prisma.topic.create({
+    data: {
+      title: "Obecná plastická chirurgie, vrozené vady",
+      slug: "a1-obecna-plasticka-chirurgie",
+      order: 1,
+    },
+  });
+
+  const questions = [
+    "Anatomie ruky a horní končetiny",
+    "Anatomie bérce a nohy",
+    "Lymfatický systém a lymfedém",
+    "Fyziologické operování, magnifikace, turniket, implantáty, psychologie",
+    "Tromboembolická prevence (DVT / PE)",
+    "Místní a svodná anestezie v plastické chirurgii",
+    "Hojení ran, krytí ran, jizvy",
+    "Kožní transplantace",
+    "Alogenní transplantace (VCA)",
+    "Lipofilling a tkáňová expanze",
+    "Laloky – klasifikace, perforátory, angiosomy, delay",
+    "Místní, regionální a vzdálené laloky",
+    "Volné laloky, non-reflow, monitoring",
+    "Periferní nervy – sutury, štěpy, vodiče, neuromy",
+  ];
+
+  for (const title of questions) {
+    await prisma.question.create({
+      data: {
+        topicId: topicA1.id,
+        title,
+        slug: slugify(title),
+        status: "DRAFT",
+        contentHtml: "",
+      },
+    });
+  }
+
+  console.log("✅ Seed hotový.");
+}
+
+main()
+  .catch((e) => {
+    console.error(e);
+    process.exit(1);
+  })
+  .finally(async () => {
+    await prisma.$disconnect();
+  });
