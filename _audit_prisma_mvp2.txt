@@ -1,0 +1,32 @@
+=== B) Prisma version + migrate status ===
+Environment variables loaded from .env
+prisma                  : 5.22.0
+@prisma/client          : 5.22.0
+Computed binaryTarget   : darwin-arm64
+Operating System        : darwin
+Architecture            : arm64
+Node.js                 : v24.12.0
+Query Engine (Node-API) : libquery-engine 605197351a3c8bdd595af2d2a9bc3025bca48ea2 (at node_modules/@prisma/engines/libquery_engine-darwin-arm64.dylib.node)
+Schema Engine           : schema-engine-cli 605197351a3c8bdd595af2d2a9bc3025bca48ea2 (at node_modules/@prisma/engines/schema-engine-darwin-arm64)
+Schema Wasm             : @prisma/prisma-schema-wasm 5.22.0-44.605197351a3c8bdd595af2d2a9bc3025bca48ea2
+Default Engines Hash    : 605197351a3c8bdd595af2d2a9bc3025bca48ea2
+Studio                  : 0.503.0
+
+Environment variables loaded from .env
+Prisma schema loaded from prisma/schema.prisma
+Datasource "db": PostgreSQL database "atesto", schema "public" at "localhost:5432"
+
+2 migrations found in prisma/migrations
+Following migration have not yet been applied:
+20260111192902_baseline_realdb
+
+To apply migrations in development run prisma migrate dev.
+To apply migrations in production run prisma migrate deploy.
+
+=== C) Tables (public) ===
+
+=== C2) \d Topic ===
+
+=== C3) \d Question ===
+
+=== D) _prisma_migrations (last 20) ===
