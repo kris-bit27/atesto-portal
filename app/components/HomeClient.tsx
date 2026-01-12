@@ -3,77 +3,106 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 
-type Q = { slug: string; title: string; status: "DRAFT" | "PUBLISHED" };
-type TopicRow = {
+type Topic = {
   id: string;
   title: string;
   slug: string;
   order: number;
   specialtyId?: string | null;
   domainId?: string | null;
-  questions: Q[];
+  questions: { slug: string; title: string; status: "DRAFT" | "PUBLISHED" }[];
 };
 
-type TaxRow = { id: string; slug: string; title: string; order: number };
+type Tax = { id: string; slug: string; title: string; order?: number };
 
 type Props = {
-  topics: TopicRow[];
-  specialties?: TaxRow[];
-  domains?: TaxRow[];
+  topics: Topic[];
+  specialties?: Tax[];
+  domains?: Tax[];
 };
 
-export default function HomeClient({ topics, specialties = [], domains = [] }: Props) {
+function getSet(key: string) {
+  if (typeof window === "undefined") return new Set<string>();
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return new Set<string>();
+    const arr = JSON.parse(raw);
+    return new Set<string>(Array.isArray(arr) ? arr : []);
+  } catch {
+    return new Set<string>();
+  }
+}
+
+export default function HomeClient(props: Props) {
+  const topics = props.topics ?? [];
+  const specialties = props.specialties ?? [];
+  const domains = props.domains ?? [];
+
+  const [query, setQuery] = useState("");
+  const q = query.trim().toLowerCase();
+
+  const [onlyPublished, setOnlyPublished] = useState(false);
+  const [onlyFav, setOnlyFav] = useState(false);
+  const [hideEmpty, setHideEmpty] = useState(true);
+
+  // MVP2 filters
   const [specialtyId, setSpecialtyId] = useState<string>("");
   const [domainId, setDomainId] = useState<string>("");
-  const [query, setQuery] = useState("");
-  const [onlyPublished, setOnlyPublished] = useState(false);
 
-  // (MVP1) localStorage readSet
+  const [favSet, setFavSet] = useState<Set<string>>(new Set());
   const [readSet, setReadSet] = useState<Set<string>>(new Set());
+
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem("atesto_read_v1") || "[]";
-      const arr = JSON.parse(raw);
-      setReadSet(new Set(Array.isArray(arr) ? arr : []));
-    } catch {
-      setReadSet(new Set());
-    }
+    setFavSet(getSet("atesto:favs"));
+    setReadSet(getSet("atesto:read"));
+    const onStorage = () => {
+      setFavSet(getSet("atesto:favs"));
+      setReadSet(getSet("atesto:read"));
+    };
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
   }, []);
 
+  const allQuestions = useMemo(() => topics.flatMap((t) => t.questions || []), [topics]);
+
   const globalProgress = useMemo(() => {
-    const all = topics.flatMap((t) => t.questions || []);
-    const total = all.length;
-    const read = all.reduce((acc, it) => acc + (readSet.has(it.slug) ? 1 : 0), 0);
-    const pct = total ? Math.round((read / total) * 100) : 0;
+    const total = allQuestions.length;
+    const read = allQuestions.reduce((acc, it) => acc + (readSet.has(it.slug) ? 1 : 0), 0);
+    const pct = total > 0 ? Math.round((read / total) * 100) : 0;
     return { total, read, pct };
-  }, [topics, readSet]);
+  }, [allQuestions, readSet]);
 
   const filteredTopics = useMemo(() => {
-    const q = query.trim().toLowerCase();
-
     return topics
       .filter((t) => (specialtyId ? t.specialtyId === specialtyId : true))
       .filter((t) => (domainId ? t.domainId === domainId : true))
-      .map((t) => {
-        const qs = (t.questions || []).filter((it) => {
+      .map((topic) => {
+        const questions = (topic.questions || []).filter((it) => {
           if (onlyPublished && it.status !== "PUBLISHED") return false;
+          if (onlyFav && !favSet.has(it.slug)) return false;
+
           if (!q) return true;
+
           return (
             it.title.toLowerCase().includes(q) ||
             it.slug.toLowerCase().includes(q) ||
-            t.title.toLowerCase().includes(q) ||
-            t.slug.toLowerCase().includes(q)
+            topic.title.toLowerCase().includes(q) ||
+            topic.slug.toLowerCase().includes(q)
           );
         });
-        return { ...t, questions: qs };
-      });
-  }, [topics, specialtyId, domainId, query, onlyPublished]);
+
+        return { ...topic, questions };
+      })
+      .filter((t) => (hideEmpty ? (t.questions || []).length > 0 : true));
+  }, [topics, specialtyId, domainId, onlyPublished, onlyFav, hideEmpty, q, favSet]);
 
   return (
     <main className="atesto-container atesto-stack">
       <header className="atesto-card">
         <div className="atesto-card-head">
-          <h1 className="atesto-h1" style={{ marginBottom: 6 }}>Atesto portál</h1>
+          <h1 className="atesto-h1" style={{ marginBottom: 6 }}>
+            Atesto portál
+          </h1>
           <div className="atesto-subtle">Učení podle témat • progress • rychlé vyhledávání</div>
         </div>
 
@@ -88,25 +117,30 @@ export default function HomeClient({ topics, specialties = [], domains = [] }: P
               </div>
             </div>
 
-            {/* MVP2 filters */}
-            <div className="atesto-filters" style={{ alignItems: "center" }}>
-              <select className="atesto-select" value={specialtyId} onChange={(e) => setSpecialtyId(e.target.value)}>
-                <option value="">Všechny obory</option>
+            {/* FILTERS */}
+            <div className="atesto-filters">
+              {/* MVP2: Specialty + Domain */}
+              <select className="atesto-input" value={specialtyId} onChange={(e) => setSpecialtyId(e.target.value)}>
+                <option value="">Specialty (vše)</option>
                 {specialties
                   .slice()
-                  .sort((a, b) => a.order - b.order)
+                  .sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
                   .map((s) => (
-                    <option key={s.id} value={s.id}>{s.title}</option>
+                    <option key={s.id} value={s.id}>
+                      {s.title}
+                    </option>
                   ))}
               </select>
 
-              <select className="atesto-select" value={domainId} onChange={(e) => setDomainId(e.target.value)}>
-                <option value="">Všechny domény</option>
+              <select className="atesto-input" value={domainId} onChange={(e) => setDomainId(e.target.value)}>
+                <option value="">Domain (vše)</option>
                 {domains
                   .slice()
-                  .sort((a, b) => a.order - b.order)
+                  .sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
                   .map((d) => (
-                    <option key={d.id} value={d.id}>{d.title}</option>
+                    <option key={d.id} value={d.id}>
+                      {d.title}
+                    </option>
                   ))}
               </select>
 
@@ -120,6 +154,16 @@ export default function HomeClient({ topics, specialties = [], domains = [] }: P
               <label className="atesto-check">
                 <input type="checkbox" checked={onlyPublished} onChange={(e) => setOnlyPublished(e.target.checked)} />
                 Jen PUBLISHED
+              </label>
+
+              <label className="atesto-check">
+                <input type="checkbox" checked={onlyFav} onChange={(e) => setOnlyFav(e.target.checked)} />
+                Jen oblíbené
+              </label>
+
+              <label className="atesto-check">
+                <input type="checkbox" checked={hideEmpty} onChange={(e) => setHideEmpty(e.target.checked)} />
+                Skrýt prázdná
               </label>
             </div>
           </div>
@@ -136,7 +180,7 @@ export default function HomeClient({ topics, specialties = [], domains = [] }: P
                     <span className="atesto-pill">{t.order}</span>
                     <strong>{t.title}</strong>
                   </div>
-                  <div className="atesto-subtle">{t.slug} • {(t.questions || []).length} otázek</div>
+                  <div className="atesto-subtle">{t.slug}</div>
                 </div>
 
                 <Link className="atesto-btn atesto-btn-ghost" href={`/topics/${t.slug}`}>
@@ -145,7 +189,9 @@ export default function HomeClient({ topics, specialties = [], domains = [] }: P
               </div>
 
               {(t.questions || []).length === 0 ? (
-                <div className="atesto-subtle" style={{ marginTop: 8 }}>Žádné otázky (nebo skryté filtrem).</div>
+                <div className="atesto-subtle" style={{ marginTop: 8 }}>
+                  Žádné otázky (nebo skryté filtrem).
+                </div>
               ) : (
                 <div className="atesto-qgrid">
                   {t.questions.map((it) => (
