@@ -753,3 +753,11 @@ body{
   background: rgba(120,255,170,.10);
   color: rgba(170,255,210,.85);
 }
+
+.atesto-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  opacity: 0.9;
+}

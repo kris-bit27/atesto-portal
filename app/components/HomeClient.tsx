@@ -34,11 +34,8 @@ function getSet(key: string) {
 }
 
 export default function HomeClient(props: Props) {
-  const topics = props.topics ?? [];
-  const specialties = props.specialties ?? [];
-  const domains = props.domains ?? [];
-
-  const [query, setQuery] = useState("");
+  const { topics, specialties = [], domains = [] } = props;
+const [query, setQuery] = useState("");
   const q = query.trim().toLowerCase();
 
   const [onlyPublished, setOnlyPublished] = useState(false);
@@ -48,6 +45,25 @@ export default function HomeClient(props: Props) {
   // MVP2 filters
   const [specialtyId, setSpecialtyId] = useState<string>("");
   const [domainId, setDomainId] = useState<string>("");
+
+  
+
+  useEffect(() => {
+    setDomainId("");
+  }, [specialtyId]);
+// lookup maps (MVP2 badges)
+  const specialtyById = useMemo(() => {
+    const m = new Map<string, any>();
+    for (const it of (specialties || [])) m.set(it.id, it);
+    return m;
+  }, [specialties]);
+
+  const domainById = useMemo(() => {
+    const m = new Map<string, any>();
+    for (const it of (domains || [])) m.set(it.id, it);
+    return m;
+  }, [domains]);
+
 
   const [favSet, setFavSet] = useState<Set<string>>(new Set());
   const [readSet, setReadSet] = useState<Set<string>>(new Set());
@@ -68,7 +84,9 @@ export default function HomeClient(props: Props) {
   const globalProgress = useMemo(() => {
     const total = allQuestions.length;
     const read = allQuestions.reduce((acc, it) => acc + (readSet.has(it.slug) ? 1 : 0), 0);
-    const pct = total > 0 ? Math.round((read / total) * 100) : 0;
+
+
+const pct = total > 0 ? Math.round((read / total) * 100) : 0;
     return { total, read, pct };
   }, [allQuestions, readSet]);
 
@@ -112,7 +130,42 @@ export default function HomeClient(props: Props) {
               <div>
                 Celkem přečteno <b>{globalProgress.read}</b> / <b>{globalProgress.total}</b> ({globalProgress.pct}%)
               </div>
-              <div className="atesto-progressbar">
+              
+
+            {/* Filters */}
+            <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+              {/* Specialty */}
+              <select className="atesto-select" value={specialtyId} onChange={(e) => setSpecialtyId(e.target.value)}>
+                <option value="">All specialties</option>
+                {specialties.map((sp) => (
+                  <option key={sp.id} value={sp.id}>
+                    {sp.title}
+                  </option>
+                ))}
+              </select>
+
+              {/* Domain */}
+              <select className="atesto-select" value={domainId} onChange={(e) => setDomainId(e.target.value)}>
+                <option value="">All domains</option>
+                {domains.map((d) => (
+                  <option key={d.id} value={d.id}>
+                    {d.title}
+                  </option>
+                ))}
+              </select>
+
+              {/* Quick toggles */}
+              <label className="atesto-checkbox">
+                <input type="checkbox" checked={onlyPublished} onChange={(e) => setOnlyPublished(e.target.checked)} />
+                Published only
+              </label>
+
+              <label className="atesto-checkbox">
+                <input type="checkbox" checked={onlyFav} onChange={(e) => setOnlyFav(e.target.checked)} />
+                Favourites
+              </label>
+            </div>
+<div className="atesto-progressbar">
                 <div className="atesto-progressbar-fill" style={{ width: `${globalProgress.pct}%` }} />
               </div>
             </div>
@@ -176,9 +229,17 @@ export default function HomeClient(props: Props) {
             <div className="atesto-card-inner">
               <div className="atesto-topic-row">
                 <div className="atesto-topic-left">
-                  <div className="atesto-topic-title">
+                  <div className="atesto-topic-title" style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
                     <span className="atesto-pill">{t.order}</span>
                     <strong>{t.title}</strong>
+                      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                        {t.specialtyId && specialtyById.get(t.specialtyId) ? (
+                          <span className="atesto-badge atesto-badge-ok">{specialtyById.get(t.specialtyId)?.title}</span>
+                        ) : null}
+                        {t.domainId && domainById.get(t.domainId) ? (
+                          <span className="atesto-badge">{domainById.get(t.domainId)?.title}</span>
+                        ) : null}
+                      </div>
                   </div>
                   <div className="atesto-subtle">{t.slug}</div>
                 </div>
