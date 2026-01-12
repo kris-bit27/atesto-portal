@@ -6,7 +6,7 @@ export const dynamic = "force-dynamic";
 export default async function Page() {
   const [topics, specialties, domains] = await Promise.all([
     prisma.topic.findMany({
-      orderBy: { order: "asc" },
+      orderBy: [{ order: "asc" }, { title: "asc" }],
       include: {
         questions: {
           orderBy: { title: "asc" },
@@ -14,10 +14,16 @@ export default async function Page() {
         },
       },
     }),
-    // pokud model Specialty/Domain existuje v Prisma Clientu, poběží.
-    // pokud by neexistoval, spadne už při build-time, proto to držíme jen na MVP2 branche.
-    prisma.specialty.findMany({ orderBy: { order: "asc" }, select: { id: true, slug: true, title: true, order: true } }),
-    prisma.domain.findMany({ orderBy: { order: "asc" }, select: { id: true, slug: true, title: true, order: true } }),
+    prisma.specialty.findMany({
+      where: { isActive: true },
+      orderBy: { order: "asc" },
+      select: { id: true, slug: true, title: true, order: true },
+    }),
+    prisma.domain.findMany({
+      where: { isActive: true },
+      orderBy: { order: "asc" },
+      select: { id: true, slug: true, title: true, order: true },
+    }),
   ]);
 
   return <HomeClient topics={topics as any} specialties={specialties as any} domains={domains as any} />;
