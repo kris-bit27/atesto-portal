@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 
+import { useTaxonomyFilters } from "@/app/lib/useTaxonomyFilters";
 type Q = { slug: string; title: string; status: "DRAFT" | "PUBLISHED"; topic?: { slug: string; title: string } | null };
 type Tax = { id: string; slug: string; title: string; order?: number };
 
@@ -25,14 +26,19 @@ function getSet(key: string) {
 }
 
 export default function SearchClient({ questions, specialties = [], domains = [] }: Props) {
-  const [query, setQuery] = useState("");
-  const q = query.trim().toLowerCase();
-
-  const [onlyPublished, setOnlyPublished] = useState(false);
-  const [onlyFav, setOnlyFav] = useState(false);
-
-  const [specialtyId, setSpecialtyId] = useState<string>("");
-  const [domainId, setDomainId] = useState<string>("");
+  const {
+    query,
+    setQuery,
+    q,
+    onlyPublished,
+    setOnlyPublished,
+    onlyFav,
+    setOnlyFav,
+    specialtyId,
+    setSpecialtyId,
+    domainId,
+    setDomainId,
+  } = useTaxonomyFilters({ defaultHideEmpty: false });
 
   const [favSet, setFavSet] = useState<Set<string>>(new Set());
   const [readSet, setReadSet] = useState<Set<string>>(new Set());

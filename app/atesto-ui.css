@@ -158,3 +158,9 @@ html, body {
 .atesto-muted{ opacity:.68; }
 .atesto-small{ font-size: 12px; opacity:.65; }
 .atesto-divider{ height:1px; background: rgba(255,255,255,.08); margin: 10px 0; }
+
+.atesto-badge-domain {
+  background: rgba(80,120,255,0.15);
+  color: #9fb4ff;
+  border: 1px solid rgba(120,150,255,0.3);
+}

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 
+import { useTaxonomyFilters } from "@/app/lib/useTaxonomyFilters";
 type Topic = {
   id: string;
   title: string;
@@ -35,23 +36,28 @@ function getSet(key: string) {
 
 export default function HomeClient(props: Props) {
   const { topics, specialties = [], domains = [] } = props;
-const [query, setQuery] = useState("");
-  const q = query.trim().toLowerCase();
+  const {
+    query,
+    setQuery,
+    q,
+    onlyPublished,
+    setOnlyPublished,
+    onlyFav,
+    setOnlyFav,
+    hideEmpty,
+    setHideEmpty,
+    specialtyId,
+    setSpecialtyId,
+    domainId,
+    setDomainId,
+  } = useTaxonomyFilters({ defaultHideEmpty: true });
 
-  const [onlyPublished, setOnlyPublished] = useState(false);
-  const [onlyFav, setOnlyFav] = useState(false);
-  const [hideEmpty, setHideEmpty] = useState(true);
-
-  // MVP2 filters
-  const [specialtyId, setSpecialtyId] = useState<string>("");
-  const [domainId, setDomainId] = useState<string>("");
-
-  
-
+  // MVP2: když změníš specialty, resetni doménu (aby nevznikl prázdný filtr)
   useEffect(() => {
-    setDomainId("");
-  }, [specialtyId]);
-// lookup maps (MVP2 badges)
+    if (specialtyId) setDomainId("");
+  }, [specialtyId, setDomainId]);
+
+  // lookup maps (MVP2 badges)
   const specialtyById = useMemo(() => {
     const m = new Map<string, any>();
     for (const it of specialties || []) m.set(it.id, it);
@@ -63,6 +69,7 @@ const [query, setQuery] = useState("");
     for (const it of domains || []) m.set(it.id, it);
     return m;
   }, [domains]);
+
 const [favSet, setFavSet] = useState<Set<string>>(new Set());
   const [readSet, setReadSet] = useState<Set<string>>(new Set());
 

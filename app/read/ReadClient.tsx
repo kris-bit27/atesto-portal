@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 
+import { useTaxonomyFilters } from "@/app/lib/useTaxonomyFilters";
 type Q = { slug: string; title: string; status: "DRAFT" | "PUBLISHED" };
 type Topic = {
   id: string;
@@ -41,16 +42,25 @@ function getSet(key: string) {
 }
 
 export default function ReadClient({ topics, specialties = [], domains = [] }: Props) {
-  const [query, setQuery] = useState("");
-  const q = query.trim().toLowerCase();
+  const {
+    query,
+    setQuery,
+    q,
+    onlyPublished,
+    setOnlyPublished,
+    onlyFav,
+    setOnlyFav,
+    hideEmpty,
+    setHideEmpty,
+    specialtyId,
+    setSpecialtyId,
+    domainId,
+    setDomainId,
+  } = useTaxonomyFilters({ defaultHideEmpty: true });
 
-  const [onlyPublished, setOnlyPublished] = useState(false);
-  const [onlyFav, setOnlyFav] = useState(false);
-  const [hideEmpty, setHideEmpty] = useState(true);
-
-  // MVP2 filters
-  const [specialtyId, setSpecialtyId] = useState<string>("");
-  const [domainId, setDomainId] = useState<string>("");
+  useEffect(() => {
+    if (specialtyId) setDomainId("");
+  }, [specialtyId, setDomainId]);
 
   const [favSet, setFavSet] = useState<Set<string>>(new Set());
   const [readSet, setReadSet] = useState<Set<string>>(new Set());
