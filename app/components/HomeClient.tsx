@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import { loadReadSet, pickNextUnread } from "@/app/lib/continue";
 
 import { useTaxonomyFilters } from "@/app/lib/useTaxonomyFilters";
 type Topic = {
@@ -33,6 +34,7 @@ function getSet(key: string) {
     return new Set<string>();
   }
 }
+
 
 export default function HomeClient(props: Props) {
   const { topics, specialties = [], domains = [] } = props;
@@ -76,10 +78,10 @@ const [favSet, setFavSet] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     setFavSet(getSet("atesto:favs"));
-    setReadSet(getSet("atesto:read"));
+    setReadSet(loadReadSet());
     const onStorage = () => {
       setFavSet(getSet("atesto:favs"));
-      setReadSet(getSet("atesto:read"));
+      setReadSet(loadReadSet());
     };
     window.addEventListener("storage", onStorage);
     return () => window.removeEventListener("storage", onStorage);
@@ -119,6 +121,11 @@ const pct = total > 0 ? Math.round((read / total) * 100) : 0;
       })
       .filter((t) => (hideEmpty ? (t.questions || []).length > 0 : true));
   }, [topics, specialtyId, domainId, onlyPublished, onlyFav, hideEmpty, q, favSet]);
+  
+  const nextUnreadSlug = useMemo(() => {
+    return pickNextUnread(filteredTopics as any, readSet);
+  }, [filteredTopics, readSet]);
+
 
   return (
     <main className="atesto-container atesto-stack">
@@ -128,7 +135,31 @@ const pct = total > 0 ? Math.round((read / total) * 100) : 0;
             Atesto portál
           </h1>
           <div className="atesto-subtle">Učení podle témat • progress • rychlé vyhledávání</div>
-        </div>
+        
+            {/* DEBUG_CONTINUE_BANNER */}
+            <div
+              style={{
+                marginTop: 10,
+                padding: 10,
+                border: "2px solid #ff3b30",
+                borderRadius: 12,
+                background: "rgba(255,59,48,0.08)",
+                display: "flex",
+                gap: 10,
+                flexWrap: "wrap",
+                alignItems: "center",
+              }}
+            >
+              <b>Continue:</b>
+              {nextUnreadSlug ? (
+                <Link className="atesto-btn" href={`/questions/${nextUnreadSlug}`}>
+                  Continue reading →
+                </Link>
+              ) : (
+                <span>Žádná další nepřečtená (nebo prázdný filtr).</span>
+              )}
+            </div>
+</div>
 
         <div className="atesto-card-inner atesto-stack">
           <div className="atesto-progress">
@@ -178,8 +209,44 @@ const pct = total > 0 ? Math.round((read / total) * 100) : 0;
                 <div className="atesto-progressbar-fill" style={{ width: `${globalProgress.pct}%` }} />
               </div>
             </div>
+              
+              <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center", marginTop: 10 }}>
+                {nextUnreadSlug ? (
+                  <Link className="atesto-btn" href={`/questions/${nextUnreadSlug}`}>
+                    Continue reading →
+                  </Link>
+                ) : (
+                  <span className="atesto-subtle">✅ Vše v aktuálním filtru přečteno</span>
+                )}
+                <button type="button" className="atesto-btn atesto-btn-ghost" onClick={resetFilters}>
+                  Reset filtry
+                </button>
+              </div>
+<div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center", marginTop: 10 }}>
+                {nextUnreadSlug ? (
+                  <Link className="atesto-btn" href={`/questions/${nextUnreadSlug}`}>
+                    Continue reading →
+                  </Link>
+                ) : (
+                  <span className="atesto-subtle">✅ Vše v aktuálním filtru přečteno</span>
+                )}
+              </div>
+
 
             {/* FILTERS */}
+
+              {/* Continue reading (B1) */}
+              <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center", marginTop: 10 }}>
+                {nextUnreadSlug ? (
+                  <Link className="atesto-btn" href={`/questions/${nextUnreadSlug}`}>
+                    Continue reading →
+                  </Link>
+                ) : (
+                  <span className="atesto-subtle">✅ Vše v aktuálním filtru přečteno</span>
+                )}
+              </div>
+
+
             <div className="atesto-filters">
               {/* MVP2: Specialty + Domain */}
               <select className="atesto-input" value={specialtyId} onChange={(e) => setSpecialtyId(e.target.value)}>
