@@ -54,16 +54,18 @@ const [query, setQuery] = useState("");
 // lookup maps (MVP2 badges)
   const specialtyById = useMemo(() => {
     const m = new Map<string, any>();
-    for (const it of specialties || []) m.set(it.id, it);
+    for (const it of (specialties || [])) m.set(it.id, it);
     return m;
   }, [specialties]);
 
   const domainById = useMemo(() => {
     const m = new Map<string, any>();
-    for (const it of domains || []) m.set(it.id, it);
+    for (const it of (domains || [])) m.set(it.id, it);
     return m;
   }, [domains]);
-const [favSet, setFavSet] = useState<Set<string>>(new Set());
+
+
+  const [favSet, setFavSet] = useState<Set<string>>(new Set());
   const [readSet, setReadSet] = useState<Set<string>>(new Set());
 
   useEffect(() => {
@@ -232,10 +234,10 @@ const pct = total > 0 ? Math.round((read / total) * 100) : 0;
                     <strong>{t.title}</strong>
                       <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                         {t.specialtyId && specialtyById.get(t.specialtyId) ? (
-                          <button type="button" className="atesto-badge atesto-badge-ok" title="Filtrovat podle specialty" onClick={() => { setSpecialtyId(t.specialtyId || ""); /*setDomainId("");*/ }}>{specialtyById.get(t.specialtyId)?.title}</button>
+                          <span className="atesto-badge atesto-badge-ok">{specialtyById.get(t.specialtyId)?.title}</span>
                         ) : null}
                         {t.domainId && domainById.get(t.domainId) ? (
-                          <button type="button" className="atesto-badge" title="Filtrovat podle domény" onClick={() => { setDomainId(t.domainId || ""); /*setSpecialtyId("");*/ }}>{domainById.get(t.domainId)?.title}</button>
+                          <span className="atesto-badge">{domainById.get(t.domainId)?.title}</span>
                         ) : null}
                       </div>
                   </div>

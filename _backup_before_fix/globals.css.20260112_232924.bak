@@ -1,0 +1,755 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: #ffffff;
+  --foreground: #171717;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0a0a0a;
+    --foreground: #ededed;
+  }
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: Arial, Helvetica, sans-serif;
+}
+/* ====== C3: Typography pro čtení (read) ====== */
+.prose {
+  line-height: 1.7;
+  font-size: 16px;
+}
+
+.prose h1,
+.prose h2,
+.prose h3,
+.prose h4 {
+  margin: 18px 0 10px;
+  line-height: 1.2;
+}
+
+.prose h2 {
+  font-size: 22px;
+  border-bottom: 1px solid rgba(255,255,255,0.12);
+  padding-bottom: 8px;
+}
+
+.prose h3 {
+  font-size: 19px;
+}
+
+.prose p {
+  margin: 10px 0;
+  opacity: 0.98;
+}
+
+.prose ul,
+.prose ol {
+  margin: 10px 0 10px 22px;
+}
+
+.prose li {
+  margin: 6px 0;
+}
+
+.prose blockquote {
+  margin: 14px 0;
+  padding: 12px 14px;
+  border-left: 4px solid rgba(201,212,255,0.65);
+  background: rgba(255,255,255,0.05);
+  border-radius: 10px;
+  opacity: 0.98;
+}
+
+.prose code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: 0.95em;
+  padding: 2px 6px;
+  border-radius: 8px;
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.10);
+}
+
+.prose pre {
+  overflow: auto;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: rgba(255,255,255,0.07);
+  border: 1px solid rgba(255,255,255,0.10);
+}
+
+.prose a {
+  color: #c9d4ff;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.prose hr {
+  border: none;
+  border-top: 1px solid rgba(255,255,255,0.12);
+  margin: 16px 0;
+}
+
+.prose table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 14px 0;
+  overflow: hidden;
+  border-radius: 12px;
+  border: 1px solid rgba(255,255,255,0.10);
+}
+
+.prose th,
+.prose td {
+  padding: 10px 12px;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+  text-align: left;
+  vertical-align: top;
+}
+
+.prose th {
+  background: rgba(255,255,255,0.06);
+  font-weight: 700;
+}
+
+.prose tr:hover td {
+  background: rgba(255,255,255,0.04);
+}
+/* ====== C4: Print / PDF ====== */
+@media print {
+  /* Skryj věci, co nechceš v PDF */
+  .no-print {
+    display: none !important;
+  }
+
+  /* Zruš tmavé pozadí */
+  html, body {
+    background: #ffffff !important;
+    color: #000000 !important;
+  }
+
+  /* Prose v tisku */
+  .prose {
+    font-size: 12pt;
+    line-height: 1.45;
+    color: #000 !important;
+  }
+
+  .prose h1, .prose h2, .prose h3, .prose h4 {
+    color: #000 !important;
+    page-break-after: avoid;
+  }
+
+  .prose h2 {
+    border-bottom: 1px solid #ddd !important;
+  }
+
+  .prose a {
+    color: #000 !important;
+    text-decoration: underline;
+  }
+
+  /* Ať tabulky a bloky nejsou “useknuté” */
+  .prose table, .prose blockquote, .prose pre {
+    page-break-inside: avoid;
+  }
+
+  /* Card/boxy v tisku jako čistý list */
+  .print-card {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+  }
+}
+/* ---- TipTap basic styling ---- */
+.tiptap-editor {
+  padding: 14px;
+  min-height: 240px;
+  outline: none;
+  line-height: 1.7;
+}
+
+.tiptap-editor h2 { margin: 18px 0 10px; font-size: 20px; }
+.tiptap-editor h3 { margin: 14px 0 8px; font-size: 17px; }
+.tiptap-editor p { margin: 10px 0; }
+.tiptap-editor ul, .tiptap-editor ol { margin: 10px 0 10px 24px; }
+.tiptap-editor li { margin: 6px 0; }
+
+/* ---- Read page HTML rendering ---- */
+.print-card h2 { margin: 18px 0 10px; font-size: 20px; }
+.print-card h3 { margin: 14px 0 8px; font-size: 17px; }
+.print-card p { margin: 10px 0; }
+.print-card ul, .print-card ol { margin: 10px 0 10px 24px; }
+.print-card li { margin: 6px 0; }
+
+@media print {
+  body { background: #fff !important; }
+  .print-card { border: none !important; background: transparent !important; }
+}
+
+/* B1: responsive TOC - na užších obrazovkách se TOC schová (nebo půjde dolů) */
+@media (max-width: 900px) {
+  .hide-on-mobile {
+    display: none !important;
+  }
+}
+
+/* ---------------------------
+   ATESTO UI THEME (MVP1 polish)
+---------------------------- */
+
+:root{
+  --bg: #07090c;
+  --panel: rgba(255,255,255,.04);
+  --panel2: rgba(255,255,255,.06);
+  --border: rgba(255,255,255,.10);
+  --border2: rgba(255,255,255,.16);
+  --text: rgba(255,255,255,.92);
+  --muted: rgba(255,255,255,.62);
+  --muted2: rgba(255,255,255,.42);
+  --accent: #8b5cf6; /* fialová */
+  --accent2: rgba(139,92,246,.18);
+  --danger: #ef4444;
+  --danger2: rgba(239,68,68,.18);
+
+  --r-lg: 18px;
+  --r-md: 14px;
+  --r-sm: 12px;
+
+  --shadow: 0 20px 60px rgba(0,0,0,.55);
+}
+
+html, body {
+  background: radial-gradient(1200px 600px at 20% 0%, rgba(139,92,246,.16), transparent 55%),
+              radial-gradient(900px 500px at 80% 10%, rgba(59,130,246,.10), transparent 55%),
+              var(--bg);
+  color: var(--text);
+}
+
+a { color: inherit; text-decoration: none; }
+a:hover { opacity: .92; }
+
+.atesto-container{
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 28px 18px 64px;
+}
+
+.atesto-header{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  margin-bottom: 18px;
+}
+
+.atesto-title{
+  font-size: 34px;
+  letter-spacing: -0.02em;
+  margin:0;
+}
+
+.atesto-subtitle{
+  color: var(--muted);
+  font-size: 13px;
+  margin-top: 4px;
+}
+
+.atesto-card{
+  border: 1px solid var(--border);
+  background: linear-gradient(180deg, rgba(255,255,255,.05), rgba(255,255,255,.03));
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow);
+}
+
+.atesto-card-inner{
+  padding: 14px;
+}
+
+.atesto-row{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+}
+
+.atesto-muted{ color: var(--muted); }
+.atesto-muted2{ color: var(--muted2); }
+
+.atesto-input, .atesto-select, .atesto-textarea{
+  width: 100%;
+  border: 1px solid var(--border2);
+  border-radius: 12px;
+  background: rgba(255,255,255,.03);
+  color: var(--text);
+  padding: 10px 12px;
+  outline: none;
+}
+
+.atesto-input:focus, .atesto-select:focus, .atesto-textarea:focus{
+  border-color: rgba(139,92,246,.55);
+  box-shadow: 0 0 0 4px rgba(139,92,246,.15);
+}
+
+.atesto-btn{
+  border: 1px solid var(--border2);
+  border-radius: 999px;
+  padding: 8px 12px;
+  background: rgba(255,255,255,.03);
+  color: var(--text);
+  cursor: pointer;
+  user-select:none;
+}
+
+.atesto-btn:hover{ background: rgba(255,255,255,.06); }
+.atesto-btn:disabled{ opacity:.55; cursor:not-allowed; }
+
+.atesto-btn-primary{
+  border-color: rgba(139,92,246,.55);
+  background: linear-gradient(180deg, rgba(139,92,246,.25), rgba(139,92,246,.12));
+}
+
+.atesto-btn-danger{
+  border-color: rgba(239,68,68,.55);
+  background: linear-gradient(180deg, rgba(239,68,68,.20), rgba(239,68,68,.10));
+}
+
+.atesto-pill{
+  display:inline-flex;
+  align-items:center;
+  gap:8px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: rgba(255,255,255,.03);
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.atesto-divider{
+  height: 1px;
+  background: rgba(255,255,255,.08);
+  margin: 10px 0;
+}
+
+
+/* =========================
+   ATESTO UI (lightweight)
+   ========================= */
+
+:root{
+  --bg0: #070A0F;
+  --bg1: #0B0F18;
+  --card: rgba(255,255,255,.04);
+  --card2: rgba(255,255,255,.06);
+  --line: rgba(255,255,255,.12);
+  --line2: rgba(255,255,255,.18);
+  --text: rgba(255,255,255,.92);
+  --muted: rgba(255,255,255,.65);
+  --muted2: rgba(255,255,255,.45);
+  --accent: #7C3AED; /* fialová */
+  --danger: rgba(255,80,80,.45);
+  --shadow: 0 10px 40px rgba(0,0,0,.45);
+}
+
+html, body {
+  background: radial-gradient(1200px 800px at 20% -10%, rgba(124,58,237,.25), transparent 55%),
+              radial-gradient(1000px 700px at 80% 10%, rgba(56,189,248,.12), transparent 60%),
+              linear-gradient(180deg, var(--bg0), var(--bg1));
+  color: var(--text);
+}
+
+a { color: inherit; text-decoration: none; }
+a:hover { text-decoration: underline; text-decoration-color: rgba(255,255,255,.25); }
+
+.atesto-container{
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 22px 16px 40px;
+}
+
+.atesto-header{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:12px;
+  margin-bottom: 14px;
+}
+
+.atesto-title{
+  font-size: 34px;
+  line-height: 1.1;
+  letter-spacing: -.02em;
+  margin:0;
+}
+
+.atesto-subtitle{
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.atesto-card{
+  border: 1px solid var(--line);
+  background: linear-gradient(180deg, rgba(255,255,255,.05), rgba(255,255,255,.03));
+  border-radius: 16px;
+  box-shadow: var(--shadow);
+}
+
+.atesto-card-inner{
+  padding: 14px;
+}
+
+.atesto-row{
+  display:flex;
+  gap:10px;
+  align-items:center;
+  flex-wrap: wrap;
+}
+
+.atesto-grid{
+  display:grid;
+  gap: 12px;
+}
+
+.atesto-input, .atesto-select{
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--line2);
+  background: rgba(0,0,0,.25);
+  color: var(--text);
+  outline: none;
+}
+
+.atesto-input:focus, .atesto-select:focus{
+  border-color: rgba(124,58,237,.6);
+  box-shadow: 0 0 0 4px rgba(124,58,237,.14);
+}
+
+.atesto-btn{
+  padding: 9px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--line2);
+  background: rgba(255,255,255,.06);
+  color: var(--text);
+  cursor: pointer;
+  user-select: none;
+}
+
+.atesto-btn:hover{
+  background: rgba(255,255,255,.09);
+}
+
+.atesto-btn:disabled{
+  opacity: .5;
+  cursor: not-allowed;
+}
+
+.atesto-pill{
+  border-radius: 999px;
+  padding: 6px 10px;
+  border: 1px solid var(--line2);
+  background: rgba(0,0,0,.18);
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.atesto-btn-danger{
+  border-color: var(--danger);
+  background: rgba(255,80,80,.06);
+}
+
+.atesto-btn-danger:hover{
+  background: rgba(255,80,80,.12);
+}
+
+.atesto-kbd{
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+/* TipTap content */
+.atesto-editor{
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  overflow: hidden;
+  background: rgba(0,0,0,.22);
+}
+
+.atesto-toolbar{
+  display:flex;
+  gap:8px;
+  flex-wrap: wrap;
+  padding: 10px;
+  border-bottom: 1px solid var(--line);
+  background: rgba(255,255,255,.03);
+  position: sticky;
+  top: 0;
+  z-index: 5;
+}
+
+.atesto-tool{
+  padding: 7px 10px;
+  border-radius: 10px;
+  border: 1px solid rgba(255,255,255,.14);
+  background: rgba(0,0,0,.25);
+  color: var(--text);
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.atesto-tool:hover{ background: rgba(255,255,255,.08); }
+
+.atesto-tool-active{
+  border-color: rgba(124,58,237,.55);
+  box-shadow: 0 0 0 3px rgba(124,58,237,.12);
+}
+
+.atesto-prose{
+  padding: 12px 12px 18px;
+  min-height: 220px;
+  line-height: 1.55;
+}
+
+.atesto-prose h2{ font-size: 20px; margin: 14px 0 8px; }
+.atesto-prose h3{ font-size: 16px; margin: 12px 0 6px; color: rgba(255,255,255,.88); }
+.atesto-prose p{ margin: 8px 0; color: rgba(255,255,255,.86); }
+.atesto-prose ul{ margin: 8px 0 8px 20px; }
+.atesto-prose blockquote{
+  margin: 10px 0;
+  padding: 10px 12px;
+  border-left: 3px solid rgba(124,58,237,.6);
+  background: rgba(124,58,237,.08);
+  border-radius: 12px;
+  color: rgba(255,255,255,.88);
+}
+.atesto-prose hr{
+  border: none;
+  border-top: 1px solid rgba(255,255,255,.12);
+  margin: 14px 0;
+}
+
+
+/* ===== ATESTO UI (minimal design system) ===== */
+:root{
+  --at-bg: #0b0d10;
+  --at-card: rgba(255,255,255,.04);
+  --at-border: rgba(255,255,255,.10);
+  --at-border2: rgba(255,255,255,.16);
+  --at-text: rgba(255,255,255,.92);
+  --at-muted: rgba(255,255,255,.60);
+  --at-accent: rgba(140,120,255,.90);
+  --at-danger: rgba(255,80,80,.75);
+}
+
+body{
+  background: radial-gradient(1200px 800px at 20% -10%, rgba(140,120,255,.18), transparent 55%),
+              radial-gradient(900px 700px at 80% 10%, rgba(80,200,255,.10), transparent 55%),
+              var(--at-bg);
+  color: var(--at-text);
+}
+
+.atesto-container{ max-width: 1100px; margin: 0 auto; padding: 24px; }
+.atesto-stack{ display: grid; gap: 14px; }
+
+.atesto-header{
+  display:flex; justify-content:space-between; align-items:center; gap:12px;
+  padding: 6px 2px;
+}
+.atesto-header-left{ display:grid; gap:6px; }
+.atesto-header-actions{ display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+
+.atesto-h1{ font-size: 34px; letter-spacing: -0.02em; margin: 0; }
+.atesto-h2{ font-size: 22px; letter-spacing: -0.01em; margin: 0; }
+.atesto-subtle{ color: var(--at-muted); font-size: 12px; }
+
+.atesto-card{
+  border: 1px solid var(--at-border);
+  border-radius: 18px;
+  background: linear-gradient(180deg, rgba(255,255,255,.05), rgba(255,255,255,.03));
+  box-shadow: 0 12px 30px rgba(0,0,0,.35);
+}
+.atesto-card-head{ padding: 14px 14px 10px 14px; border-bottom: 1px solid rgba(255,255,255,.06); }
+.atesto-card-inner{ padding: 12px 14px; border-radius: 14px; }
+
+.atesto-alert{
+  border: 1px solid var(--at-border);
+  border-radius: 14px;
+  padding: 12px;
+  background: rgba(255,255,255,.03);
+}
+.atesto-alert-error{
+  border-color: rgba(255,80,80,.45);
+  background: rgba(255,80,80,.08);
+}
+
+.atesto-input{
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--at-border2);
+  background: rgba(0,0,0,.15);
+  color: var(--at-text);
+  outline: none;
+}
+.atesto-input:focus{
+  border-color: rgba(140,120,255,.55);
+  box-shadow: 0 0 0 3px rgba(140,120,255,.18);
+}
+
+.atesto-btn{
+  padding: 9px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--at-border2);
+  background: rgba(255,255,255,.06);
+  color: var(--at-text);
+  cursor: pointer;
+  user-select: none;
+}
+.atesto-btn:hover{ background: rgba(255,255,255,.09); }
+.atesto-btn:disabled{ opacity: .6; cursor: not-allowed; }
+.atesto-btn-ghost{ background: transparent; }
+.atesto-btn-primary{
+  border-color: rgba(140,120,255,.45);
+  background: rgba(140,120,255,.18);
+}
+.atesto-btn-primary:hover{ background: rgba(140,120,255,.26); }
+.atesto-btn-danger{
+  border-color: rgba(255,80,80,.40);
+  background: rgba(255,80,80,.10);
+}
+.atesto-btn-danger:hover{ background: rgba(255,80,80,.16); }
+
+.atesto-grid{ display:grid; gap: 10px; }
+.atesto-grid-topics{ grid-template-columns: 1fr 1fr 120px 160px; }
+.atesto-grid-topics-row{ grid-template-columns: 1fr 1fr 120px 260px; align-items:center; }
+.atesto-grid-questions{ grid-template-columns: 220px 1fr 1fr 140px 160px; }
+.atesto-grid-qrow{ grid-template-columns: 220px 1fr 1fr 160px; }
+
+.atesto-row-right{ display:flex; gap:10px; justify-content:flex-end; align-items:center; flex-wrap:wrap; }
+
+.atesto-qhead{ display:flex; justify-content:space-between; align-items:center; gap:12px; }
+.atesto-qmeta{ display:grid; gap:6px; }
+.atesto-qtitle{ font-size: 16px; }
+
+.atesto-toolbar{
+  display:flex; gap:8px; flex-wrap:wrap;
+  padding: 10px 12px;
+  border-bottom: 1px solid rgba(255,255,255,.06);
+}
+.atesto-chip{
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--at-border2);
+  background: rgba(255,255,255,.05);
+  color: var(--at-text);
+  cursor:pointer;
+}
+.atesto-chip:hover{ background: rgba(255,255,255,.08); }
+
+.atesto-editor{
+  min-height: 180px;
+  padding: 10px 4px;
+  outline: none;
+}
+.atesto-editor:empty:before{
+  content: attr(data-placeholder);
+  color: rgba(255,255,255,.35);
+}
+
+/* ===== Home/Topics UI helpers ===== */
+.atesto-page{ padding-top: 18px; }
+.atesto-topbar{
+  position: sticky; top: 0; z-index: 20;
+  backdrop-filter: blur(10px);
+  background: rgba(0,0,0,.35);
+  border-bottom: 1px solid rgba(255,255,255,.08);
+}
+.atesto-topbar-inner{
+  max-width: 1100px; margin: 0 auto; padding: 10px 24px;
+  display:flex; align-items:center; justify-content:space-between; gap:12px;
+}
+.atesto-brand{
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  text-decoration: none;
+  color: rgba(255,255,255,.92);
+}
+.atesto-brand-dot{ color: var(--at-accent); margin: 0 4px; }
+.atesto-nav{ display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+.atesto-navlink{
+  padding: 7px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,.10);
+  text-decoration: none;
+  color: rgba(255,255,255,.86);
+  background: rgba(255,255,255,.03);
+}
+.atesto-navlink:hover{ background: rgba(255,255,255,.06); border-color: rgba(255,255,255,.18); }
+
+.atesto-progress{ display:grid; gap: 12px; }
+.atesto-progress-row{ display:flex; gap:12px; align-items:center; justify-content:space-between; flex-wrap:wrap; }
+.atesto-progressbar{
+  width: 260px; height: 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,.14);
+  overflow: hidden;
+  background: rgba(0,0,0,.18);
+}
+.atesto-progressbar-fill{ height: 100%; background: rgba(255,255,255,.35); }
+
+.atesto-filters{ display:flex; gap:12px; align-items:center; flex-wrap:wrap; }
+.atesto-check{ display:flex; gap:8px; align-items:center; color: rgba(255,255,255,.75); font-size: 13px; }
+
+.atesto-pill{
+  display:inline-flex; align-items:center; justify-content:center;
+  min-width: 28px; height: 24px;
+  padding: 0 8px;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,.14);
+  background: rgba(255,255,255,.04);
+  font-size: 12px;
+  color: rgba(255,255,255,.8);
+}
+
+.atesto-topic-row{ display:flex; justify-content:space-between; gap:12px; align-items:center; }
+.atesto-topic-left{ display:grid; gap:6px; }
+.atesto-topic-title{ display:flex; gap:10px; align-items:center; }
+
+.atesto-qgrid{ margin-top: 12px; display:grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+@media (max-width: 900px){ .atesto-qgrid{ grid-template-columns: 1fr; } }
+
+.atesto-qitem{
+  border: 1px solid rgba(255,255,255,.10);
+  border-radius: 14px;
+  padding: 12px;
+  text-decoration: none;
+  color: rgba(255,255,255,.92);
+  background: rgba(255,255,255,.03);
+  display:grid; gap: 8px;
+}
+.atesto-qitem:hover{ background: rgba(255,255,255,.06); border-color: rgba(255,255,255,.18); }
+.atesto-qitem-head{ display:flex; justify-content:space-between; gap:10px; align-items:flex-start; }
+.atesto-qitem-title{ font-weight: 600; line-height: 1.25; }
+.atesto-qitem-sub{ display:flex; justify-content:space-between; gap:10px; align-items:center; }
+
+.atesto-badge{
+  font-size: 11px;
+  padding: 4px 8px;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,.14);
+  color: rgba(255,255,255,.75);
+  background: rgba(0,0,0,.18);
+}
+.atesto-badge-ok{
+  border-color: rgba(120,255,170,.25);
+  background: rgba(120,255,170,.10);
+  color: rgba(170,255,210,.85);
+}

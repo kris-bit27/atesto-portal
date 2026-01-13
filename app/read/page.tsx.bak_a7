@@ -10,7 +10,7 @@ export default async function ReadPage() {
       include: {
         questions: {
           orderBy: { title: "asc" },
-          select: { slug: true, title: true, status: true, kind: true, source: true, specialtyId: true },
+          select: { slug: true, title: true, status: true },
         },
       },
     }),

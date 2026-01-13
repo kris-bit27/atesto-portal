@@ -1,219 +1,202 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { FAV_KEY, loadFavSet, toggleFav, saveStringSet } from "@/app/lib/favorites";
+import { useEffect, useMemo, useState } from "react";
 
-const READ_KEY = "atesto_read_slugs";
+type Tax = { id: string; slug: string; title: string; order?: number };
 
-function loadReadSet(): Set<string> {
-  if (typeof window === "undefined") return new Set();
-  try {
-    const raw = window.localStorage.getItem(READ_KEY);
-    if (!raw) return new Set();
-    const arr = JSON.parse(raw);
-    if (!Array.isArray(arr)) return new Set();
-    return new Set(arr.filter((x) => typeof x === "string"));
-  } catch {
-    return new Set();
-  }
-}
+type Question = { slug: string; title: string; status: "DRAFT" | "PUBLISHED" };
 
-type Question = {
-  slug: string;
+type Topic = {
+  id: string;
   title: string;
-  status: string; // "DRAFT" | "PUBLISHED" ...
+  slug: string;
+  order: number;
+  specialtyId?: string | null;
+  domainId?: string | null;
+  questions: Question[];
 };
 
 type Props = {
-  questions: Question[];
-  topicTitle: string;
+  topic: Topic;
+  specialties?: Tax[];
+  domains?: Tax[];
 };
 
-export default function TopicClient({ questions, topicTitle }: Props) {
-  const [query, setQuery] = useState("");
-  const [onlyPublished, setOnlyPublished] = useState(true);
-  
-  const [onlyFav, setOnlyFav] = useState(false);
-  const [favSet, setFavSet] = useState<Set<string>>(() => new Set());
-const [onlyUnread, setOnlyUnread] = useState(false);
+function getSet(key: string) {
+  if (typeof window === "undefined") return new Set<string>();
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return new Set<string>();
+    const arr = JSON.parse(raw);
+    return new Set<string>(Array.isArray(arr) ? arr : []);
+  } catch {
+    return new Set<string>();
+  }
+}
 
+export default function TopicClient({ topic, specialties = [], domains = [] }: Props) {
+  const [query, setQuery] = useState("");
+  const q = query.trim().toLowerCase();
+
+  const [onlyPublished, setOnlyPublished] = useState(false);
+  const [onlyFav, setOnlyFav] = useState(false);
+  const [hideEmpty, setHideEmpty] = useState(true);
+
+  // “scoped” filtry (na topic stránce je to spíš UI konzistence; topic už je pevně daný)
+  const [specialtyId, setSpecialtyId] = useState<string>("");
+  const [domainId, setDomainId] = useState<string>("");
+
+  const [favSet, setFavSet] = useState<Set<string>>(new Set());
   const [readSet, setReadSet] = useState<Set<string>>(new Set());
 
   useEffect(() => {
-  setFavSet(loadFavSet());
-
-  const onFavsUpdate = () => setFavSet(loadFavSet());
-  window.addEventListener("atesto-favs-updated", onFavsUpdate);
-  window.addEventListener("storage", onFavsUpdate);
-    // initial load
-    setReadSet(loadReadSet());
-
-    // aktualizace, když se změní localStorage (jiný tab) nebo když dispatchneme náš event
-    const onUpdate = () => setReadSet(loadReadSet());
-
-    window.addEventListener("atesto-read-updated", onUpdate as EventListener);
-    window.addEventListener("storage", onUpdate);
-
-    return () => {
-    window.removeEventListener("atesto-favs-updated", onFavsUpdate);
-    window.removeEventListener("storage", onFavsUpdate);
-      window.removeEventListener("atesto-read-updated", onUpdate as EventListener);
-      window.removeEventListener("storage", onUpdate);
+    setFavSet(getSet("atesto:favs"));
+    setReadSet(getSet("atesto:read"));
+    const onStorage = () => {
+      setFavSet(getSet("atesto:favs"));
+      setReadSet(getSet("atesto:read"));
     };
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
   }, []);
 
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
+  const specialtyById = useMemo(() => {
+    const m = new Map<string, Tax>();
+    for (const it of specialties || []) m.set(it.id, it);
+    return m;
+  }, [specialties]);
 
-    return questions.filter((item) => {
-      if (onlyPublished && item.status !== "PUBLISHED") return false;
-      if (q && !item.title.toLowerCase().includes(q)) return false;
-      if (onlyUnread && readSet.has(item.slug)) return false;
-      return true;
-    });
-  }, [questions, query, onlyPublished, onlyUnread, readSet]);
+  const domainById = useMemo(() => {
+    const m = new Map<string, Tax>();
+    for (const it of domains || []) m.set(it.id, it);
+    return m;
+  }, [domains]);
 
-  const readCount = useMemo(() => {
-    let c = 0;
-    for (const item of questions) if (readSet.has(item.slug)) c++;
-    return c;
-  }, [questions, readSet]);
+  const filteredQuestions = useMemo(() => {
+    const qs = topic.questions || [];
+    return qs
+      .filter((it) => (onlyPublished ? it.status === "PUBLISHED" : true))
+      .filter((it) => (onlyFav ? favSet.has(it.slug) : true))
+      .filter((it) => {
+        if (!q) return true;
+        return it.title.toLowerCase().includes(q) || it.slug.toLowerCase().includes(q) || topic.title.toLowerCase().includes(q);
+      })
+      .filter((it) => (hideEmpty ? true : true)); // placeholder (u otázky nemáme empty)
+  }, [topic, onlyPublished, onlyFav, favSet, q, hideEmpty]);
 
-    const toggleFav = (slug: string) => {
-    const next = new Set(favSet);
-    if (next.has(slug)) next.delete(slug);
-    else next.add(slug);
-    setFavSet(next);
-    saveStringSet(FAV_KEY, next);
-  };
+  const shown = filteredQuestions.length;
+  const total = (topic.questions || []).length;
+  const readInFilter = filteredQuestions.reduce((acc, it) => acc + (readSet.has(it.slug) ? 1 : 0), 0);
+  const pct = shown > 0 ? Math.round((readInFilter / shown) * 100) : 0;
 
-return (
-    <main style={{ display: "grid", gap: 12 }}>
-      <h1 style={{ margin: 0 }}>{topicTitle}</h1>
+  return (
+    <main className="atesto-container atesto-stack">
+      <header className="atesto-card">
+        <div className="atesto-card-head">
+          <div className="atesto-subtle" style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
+            <span>{topic.order}.</span>
+            <span>{topic.slug}</span>
+          </div>
 
-      <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
-        <input
-          placeholder="Hledat otázku…"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          style={{
-            minWidth: 260,
-            padding: "10px 12px",
-            borderRadius: 10,
-            border: "1px solid rgba(255,255,255,.15)",
-            background: "rgba(255,255,255,.04)",
-          }}
-        />
+          <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
+            <h1 className="atesto-h1" style={{ margin: 0 }}>
+              {topic.title}
+            </h1>
 
-        <label style={{ display: "flex", gap: 8, alignItems: "center" }}>
-          <input
-            type="checkbox"
-            checked={onlyPublished}
-            onChange={(e) => setOnlyPublished(e.target.checked)}
-          />
-          Jen PUBLISHED
-        </label>
-
-        <label style={{ display: "flex", gap: 8, alignItems: "center" }}>
-          <input
-            type="checkbox"
-            checked={onlyUnread}
-            onChange={(e) => setOnlyUnread(e.target.checked)}
-          />
-          Jen NEPŘEČTENÉ
-        </label>
-
-        <div style={{ opacity: 0.75 }}>
-          Přečteno: <b>{readCount}</b> / {questions.length}
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+              {topic.specialtyId && specialtyById.get(topic.specialtyId) ? (
+                <span className="atesto-badge atesto-badge-ok">{specialtyById.get(topic.specialtyId)?.title}</span>
+              ) : null}
+              {topic.domainId && domainById.get(topic.domainId) ? (
+                <span className="atesto-badge">{domainById.get(topic.domainId)?.title}</span>
+              ) : null}
+              <Link className="atesto-btn atesto-btn-ghost" href="/">
+                ← Home
+              </Link>
+            </div>
+          </div>
         </div>
-      </div>
 
-      {filtered.length === 0 ? (
-        <div style={{ opacity: 0.8 }}>Žádné otázky (nebo skryté filtrem).</div>
-      ) : (
-        <div style={{ display: "grid", gap: 10 }}>
-          {filtered.map((q) => {
-            const isRead = readSet.has(q.slug);
+        <div className="atesto-card-inner atesto-stack">
+          {/* Filtry (vzhledově jako Read) */}
+          <input
+            className="atesto-input"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Hledej v otázkách (title/slug)…"
+          />
 
-            return (
-              <div
-                key={q.slug}
-                style={{
-                  border: "1px solid rgba(255,255,255,.15)",
-                  borderRadius: 14,
-                  padding: 12,
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  gap: 12,
-                }}
-              >
-                <div style={{ display: "grid", gap: 4 }}>
-                  <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-                    <div style={{ fontWeight: 700 }}>{q.title}</div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+            <select className="atesto-input" value={specialtyId} onChange={(e) => setSpecialtyId(e.target.value)}>
+              <option value="">Všechny specialty</option>
+              {specialties.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.title}
+                </option>
+              ))}
+            </select>
 
-                    {/* ✅ NOVĚ: badge "PŘEČTENO" v seznamu */}
-                    {isRead && (
-                      <span
-                        style={{
-                          fontSize: 12,
-                          padding: "3px 8px",
-                          borderRadius: 999,
-                          border: "1px solid rgba(255,255,255,.22)",
-                          opacity: 0.9,
-                        }}
-                      >
-                        PŘEČTENO
+            <select className="atesto-input" value={domainId} onChange={(e) => setDomainId(e.target.value)}>
+              <option value="">Všechny domény</option>
+              {domains.map((d) => (
+                <option key={d.id} value={d.id}>
+                  {d.title}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div style={{ display: "flex", gap: 14, flexWrap: "wrap", alignItems: "center" }}>
+            <label className="atesto-subtle" style={{ display: "flex", gap: 8, alignItems: "center" }}>
+              <input type="checkbox" checked={onlyPublished} onChange={(e) => setOnlyPublished(e.target.checked)} />
+              jen PUBLISHED
+            </label>
+
+            <label className="atesto-subtle" style={{ display: "flex", gap: 8, alignItems: "center" }}>
+              <input type="checkbox" checked={onlyFav} onChange={(e) => setOnlyFav(e.target.checked)} />
+              jen ⭐
+            </label>
+
+            <label className="atesto-subtle" style={{ display: "flex", gap: 8, alignItems: "center" }}>
+              <input type="checkbox" checked={hideEmpty} onChange={(e) => setHideEmpty(e.target.checked)} />
+              schovat prázdné
+            </label>
+          </div>
+
+          <div className="atesto-subtle">
+            Zobrazeno: <strong>{shown}</strong> / {total} • přečteno v aktuálním filtru: <strong>{readInFilter}</strong> ({pct}%)
+          </div>
+        </div>
+      </header>
+
+      <section className="atesto-card">
+        <div className="atesto-card-inner atesto-stack">
+          {filteredQuestions.length === 0 ? (
+            <div className="atesto-subtle">Žádné otázky (nebo skryté filtrem).</div>
+          ) : (
+            <div className="atesto-grid">
+              {filteredQuestions.map((it) => (
+                <Link key={it.slug} className="atesto-card atesto-card-mini" href={`/questions/${it.slug}`}>
+                  <div className="atesto-card-inner atesto-stack" style={{ gap: 6 }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center" }}>
+                      <strong>{it.title}</strong>
+                      <span className={it.status === "PUBLISHED" ? "atesto-badge atesto-badge-ok" : "atesto-badge"}>
+                        {it.status}
                       </span>
-                    )}
+                    </div>
 
-                    <span
-                      style={{
-                        fontSize: 12,
-                        padding: "3px 8px",
-                        borderRadius: 999,
-                        border: "1px solid rgba(255,255,255,.15)",
-                        opacity: 0.85,
-                      }}
-                    >
-                      {q.status}
-                    </span>
+                    <div className="atesto-subtle" style={{ display: "flex", justifyContent: "space-between", gap: 10 }}>
+                      <span>{it.slug}</span>
+                      <span>{readSet.has(it.slug) ? "✓ READ" : ""}</span>
+                    </div>
                   </div>
-
-                  <div style={{ opacity: 0.7, fontSize: 13 }}>/read/{q.slug}</div>
-                </div>
-
-                <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                  <Link
-                    href={`/read/${q.slug}`}
-                    style={{
-                      padding: "8px 12px",
-                      borderRadius: 10,
-                      border: "1px solid rgba(255,255,255,.15)",
-                      textDecoration: "none",
-                    }}
-                  >
-                    Číst
-                  </Link>
-
-                  <Link
-                    href={`/questions/${q.slug}`}
-                    style={{
-                      padding: "8px 12px",
-                      borderRadius: 10,
-                      border: "1px solid rgba(255,255,255,.15)",
-                      textDecoration: "none",
-                    }}
-                  >
-                    Edit
-                  </Link>
-                </div>
-              </div>
-            );
-          })}
+                </Link>
+              ))}
+            </div>
+          )}
         </div>
-      )}
+      </section>
     </main>
   );
 }

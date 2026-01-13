@@ -3,152 +3,173 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 
-type Result = {
-  slug: string;
-  title: string;
-  status: string;
-  updatedAt: string;
-  topic: { slug: string; title: string; order: number } | null;
+type Q = { slug: string; title: string; status: "DRAFT" | "PUBLISHED"; topic?: { slug: string; title: string } | null };
+type Tax = { id: string; slug: string; title: string; order?: number };
+
+type Props = {
+  questions: (Q & { specialtyId?: string | null; domainId?: string | null })[];
+  specialties?: Tax[];
+  domains?: Tax[];
 };
 
-export default function SearchClient() {
-  const [q, setQ] = useState("");
-  const [publishedOnly, setPublishedOnly] = useState(true);
-  const [loading, setLoading] = useState(false);
-  const [results, setResults] = useState<Result[]>([]);
-  const [error, setError] = useState<string | null>(null);
+function getSet(key: string) {
+  if (typeof window === "undefined") return new Set<string>();
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return new Set<string>();
+    const arr = JSON.parse(raw);
+    return new Set<string>(Array.isArray(arr) ? arr : []);
+  } catch {
+    return new Set<string>();
+  }
+}
 
-  const qs = useMemo(() => q.trim(), [q]);
+export default function SearchClient({ questions, specialties = [], domains = [] }: Props) {
+  const [query, setQuery] = useState("");
+  const q = query.trim().toLowerCase();
+
+  const [onlyPublished, setOnlyPublished] = useState(false);
+  const [onlyFav, setOnlyFav] = useState(false);
+
+  const [specialtyId, setSpecialtyId] = useState<string>("");
+  const [domainId, setDomainId] = useState<string>("");
+
+  const [favSet, setFavSet] = useState<Set<string>>(new Set());
+  const [readSet, setReadSet] = useState<Set<string>>(new Set());
 
   useEffect(() => {
-    // debounce vyhledávání
-    if (!qs) {
-      setResults([]);
-      setError(null);
-      return;
-    }
+    setFavSet(getSet("atesto:favs"));
+    setReadSet(getSet("atesto:read"));
+    const onStorage = () => {
+      setFavSet(getSet("atesto:favs"));
+      setReadSet(getSet("atesto:read"));
+    };
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
+  }, []);
 
-    setLoading(true);
-    setError(null);
+  const specialtyById = useMemo(() => {
+    const m = new Map<string, Tax>();
+    for (const it of specialties || []) m.set(it.id, it);
+    return m;
+  }, [specialties]);
 
-    const t = window.setTimeout(async () => {
-      try {
-        const url = `/api/search?q=${encodeURIComponent(qs)}&published=${publishedOnly ? "1" : "0"}&take=80`;
-        const res = await fetch(url);
-        const data = await res.json();
-        if (!res.ok) throw new Error(data?.error || `HTTP ${res.status}`);
-        setResults(Array.isArray(data?.results) ? data.results : []);
-      } catch (e: any) {
-        setError(String(e?.message ?? e));
-        setResults([]);
-      } finally {
-        setLoading(false);
-      }
-    }, 350);
+  const domainById = useMemo(() => {
+    const m = new Map<string, Tax>();
+    for (const it of domains || []) m.set(it.id, it);
+    return m;
+  }, [domains]);
 
-    return () => window.clearTimeout(t);
-  }, [qs, publishedOnly]);
+  const filtered = useMemo(() => {
+    return (questions || [])
+      .filter((x) => (specialtyId ? x.specialtyId === specialtyId : true))
+      .filter((x) => (domainId ? x.domainId === domainId : true))
+      .filter((x) => (onlyPublished ? x.status === "PUBLISHED" : true))
+      .filter((x) => (onlyFav ? favSet.has(x.slug) : true))
+      .filter((x) => {
+        if (!q) return true;
+        const topicTitle = x.topic?.title ?? "";
+        const topicSlug = x.topic?.slug ?? "";
+        return (
+          x.title.toLowerCase().includes(q) ||
+          x.slug.toLowerCase().includes(q) ||
+          topicTitle.toLowerCase().includes(q) ||
+          topicSlug.toLowerCase().includes(q)
+        );
+      });
+  }, [questions, specialtyId, domainId, onlyPublished, onlyFav, favSet, q]);
 
   return (
-    <main style={{ maxWidth: 980, margin: "0 auto", padding: 16, display: "grid", gap: 14 }}>
-      <header style={{ display: "grid", gap: 10 }}>
-        <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center" }}>
-          <h1 style={{ margin: 0 }}>Vyhledávání</h1>
-          <div style={{ display: "flex", gap: 10 }}>
-            <Link href="/" style={{ padding: "6px 10px", borderRadius: 999, border: "1px solid rgba(255,255,255,.2)" }}>
-              ← Zpět
-            </Link>
-          </div>
+    <main className="atesto-container atesto-stack">
+      <header className="atesto-card">
+        <div className="atesto-card-head">
+          <h1 className="atesto-h1" style={{ marginBottom: 6 }}>
+            Search
+          </h1>
+          <div className="atesto-subtle">Hledání napříč otázkami • taxonomy filtry</div>
         </div>
 
-        <div
-          style={{
-            border: "1px solid rgba(255,255,255,.15)",
-            borderRadius: 14,
-            padding: 12,
-            display: "grid",
-            gap: 10,
-          }}
-        >
-          <input
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            placeholder="Hledej v názvu, slugu i v obsahu (contentHtml)…"
-            style={{
-              width: "100%",
-              padding: "10px 12px",
-              borderRadius: 10,
-              border: "1px solid rgba(255,255,255,.2)",
-              background: "transparent",
-              color: "inherit",
-            }}
-          />
+        <div className="atesto-card-inner atesto-stack">
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
+            <input
+              className="atesto-input"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Hledej (title/slug/topic)…"
+              style={{ minWidth: 260 }}
+            />
 
-          <label style={{ display: "flex", gap: 8, alignItems: "center" }}>
-            <input type="checkbox" checked={publishedOnly} onChange={(e) => setPublishedOnly(e.target.checked)} />
-            Jen PUBLISHED
-          </label>
+            <select className="atesto-input" value={specialtyId} onChange={(e) => setSpecialtyId(e.target.value)}>
+              <option value="">Všechny specialty</option>
+              {specialties.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.title}
+                </option>
+              ))}
+            </select>
 
-          <div style={{ opacity: 0.85, fontSize: 13 }}>
-            {loading ? "Hledám…" : qs ? `Nalezeno: ${results.length}` : "Zadej dotaz."}
-            {error ? <span style={{ color: "salmon" }}> • Chyba: {error}</span> : null}
+            <select className="atesto-input" value={domainId} onChange={(e) => setDomainId(e.target.value)}>
+              <option value="">Všechny domény</option>
+              {domains.map((d) => (
+                <option key={d.id} value={d.id}>
+                  {d.title}
+                </option>
+              ))}
+            </select>
+
+            <label className="atesto-subtle" style={{ display: "flex", gap: 8, alignItems: "center" }}>
+              <input type="checkbox" checked={onlyPublished} onChange={(e) => setOnlyPublished(e.target.checked)} />
+              jen PUBLISHED
+            </label>
+
+            <label className="atesto-subtle" style={{ display: "flex", gap: 8, alignItems: "center" }}>
+              <input type="checkbox" checked={onlyFav} onChange={(e) => setOnlyFav(e.target.checked)} />
+              jen ⭐
+            </label>
+          </div>
+
+          <div className="atesto-subtle" style={{ marginTop: 6 }}>
+            Nalezeno: <strong>{filtered.length}</strong> / {questions.length}
           </div>
         </div>
       </header>
 
-      <section style={{ display: "grid", gap: 10 }}>
-        {qs && !loading && results.length === 0 ? (
-          <div style={{ opacity: 0.7 }}>Nic nenalezeno.</div>
-        ) : null}
+      <section className="atesto-card">
+        <div className="atesto-card-inner atesto-stack">
+          {filtered.length === 0 ? (
+            <div className="atesto-subtle">Nic nenalezeno.</div>
+          ) : (
+            <div className="atesto-grid">
+              {filtered.map((x) => (
+                <Link key={x.slug} className="atesto-card atesto-card-mini" href={`/questions/${x.slug}`}>
+                  <div className="atesto-card-inner atesto-stack" style={{ gap: 6 }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center" }}>
+                      <strong>{x.title}</strong>
+                      <span className={x.status === "PUBLISHED" ? "atesto-badge atesto-badge-ok" : "atesto-badge"}>
+                        {x.status}
+                      </span>
+                    </div>
 
-        {results.map((r) => (
-          <div
-            key={r.slug}
-            style={{
-              border: "1px solid rgba(255,255,255,.12)",
-              borderRadius: 14,
-              padding: 12,
-              display: "flex",
-              justifyContent: "space-between",
-              gap: 12,
-              alignItems: "center",
-            }}
-          >
-            <div style={{ display: "grid", gap: 4 }}>
-              <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-                <strong>{r.title}</strong>
-                <span style={{ opacity: 0.75, fontSize: 12 }}>{r.status}</span>
-              </div>
+                    <div className="atesto-subtle" style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                      {x.specialtyId && specialtyById.get(x.specialtyId) ? (
+                        <span className="atesto-badge atesto-badge-ok">{specialtyById.get(x.specialtyId)?.title}</span>
+                      ) : null}
+                      {x.domainId && domainById.get(x.domainId) ? (
+                        <span className="atesto-badge">{domainById.get(x.domainId)?.title}</span>
+                      ) : null}
+                      {x.topic?.title ? <span className="atesto-subtle">• {x.topic.title}</span> : null}
+                    </div>
 
-              <div style={{ opacity: 0.7, fontSize: 12 }}>
-                {r.topic ? (
-                  <>
-                    {r.topic.order}. {r.topic.title} • <span style={{ opacity: 0.8 }}>{r.topic.slug}</span>
-                  </>
-                ) : (
-                  <span>Bez tématu</span>
-                )}
-                {" • "}
-                <span style={{ opacity: 0.8 }}>{r.slug}</span>
-              </div>
+                    <div className="atesto-subtle" style={{ display: "flex", justifyContent: "space-between", gap: 10 }}>
+                      <span>{x.slug}</span>
+                      <span>{readSet.has(x.slug) ? "✓ READ" : ""}</span>
+                    </div>
+                  </div>
+                </Link>
+              ))}
             </div>
-
-            <div style={{ display: "flex", gap: 10 }}>
-              <Link
-                href={`/read/${r.slug}`}
-                style={{ padding: "8px 12px", borderRadius: 12, border: "1px solid rgba(255,255,255,.2)" }}
-              >
-                Číst
-              </Link>
-              <Link
-                href={`/questions/${r.slug}`}
-                style={{ padding: "8px 12px", borderRadius: 12, border: "1px solid rgba(255,255,255,.2)" }}
-              >
-                Edit
-              </Link>
-            </div>
-          </div>
-        ))}
+          )}
+        </div>
       </section>
     </main>
   );

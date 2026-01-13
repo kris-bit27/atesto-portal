@@ -10,7 +10,7 @@ type Topic = {
   order: number;
   specialtyId?: string | null;
   domainId?: string | null;
-  questions: { slug: string; title: string; status: "DRAFT" | "PUBLISHED"; kind?: string; source?: string; specialtyId?: string | null }[];
+  questions: { slug: string; title: string; status: "DRAFT" | "PUBLISHED" }[];
 };
 
 type Tax = { id: string; slug: string; title: string; order?: number };
@@ -46,24 +46,7 @@ const [query, setQuery] = useState("");
   const [specialtyId, setSpecialtyId] = useState<string>("");
   const [domainId, setDomainId] = useState<string>("");
 
-  
-
-  useEffect(() => {
-    setDomainId("");
-  }, [specialtyId]);
-// lookup maps (MVP2 badges)
-  const specialtyById = useMemo(() => {
-    const m = new Map<string, any>();
-    for (const it of specialties || []) m.set(it.id, it);
-    return m;
-  }, [specialties]);
-
-  const domainById = useMemo(() => {
-    const m = new Map<string, any>();
-    for (const it of domains || []) m.set(it.id, it);
-    return m;
-  }, [domains]);
-const [favSet, setFavSet] = useState<Set<string>>(new Set());
+  const [favSet, setFavSet] = useState<Set<string>>(new Set());
   const [readSet, setReadSet] = useState<Set<string>>(new Set());
 
   useEffect(() => {
@@ -82,7 +65,18 @@ const [favSet, setFavSet] = useState<Set<string>>(new Set());
   const globalProgress = useMemo(() => {
     const total = allQuestions.length;
     const read = allQuestions.reduce((acc, it) => acc + (readSet.has(it.slug) ? 1 : 0), 0);
+    
+  const specialtyById = useMemo(() => {
+    const m = new Map<string, any>();
+    for (const it of (specialties || [])) m.set(it.id, it);
+    return m;
+  }, [specialties]);
 
+  const domainById = useMemo(() => {
+    const m = new Map<string, any>();
+    for (const it of (domains || [])) m.set(it.id, it);
+    return m;
+  }, [domains]);
 
 const pct = total > 0 ? Math.round((read / total) * 100) : 0;
     return { total, read, pct };
@@ -128,42 +122,7 @@ const pct = total > 0 ? Math.round((read / total) * 100) : 0;
               <div>
                 Celkem přečteno <b>{globalProgress.read}</b> / <b>{globalProgress.total}</b> ({globalProgress.pct}%)
               </div>
-              
-
-            {/* Filters */}
-            <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-              {/* Specialty */}
-              <select className="atesto-select" value={specialtyId} onChange={(e) => setSpecialtyId(e.target.value)}>
-                <option value="">All specialties</option>
-                {specialties.map((sp) => (
-                  <option key={sp.id} value={sp.id}>
-                    {sp.title}
-                  </option>
-                ))}
-              </select>
-
-              {/* Domain */}
-              <select className="atesto-select" value={domainId} onChange={(e) => setDomainId(e.target.value)}>
-                <option value="">All domains</option>
-                {domains.map((d) => (
-                  <option key={d.id} value={d.id}>
-                    {d.title}
-                  </option>
-                ))}
-              </select>
-
-              {/* Quick toggles */}
-              <label className="atesto-checkbox">
-                <input type="checkbox" checked={onlyPublished} onChange={(e) => setOnlyPublished(e.target.checked)} />
-                Published only
-              </label>
-
-              <label className="atesto-checkbox">
-                <input type="checkbox" checked={onlyFav} onChange={(e) => setOnlyFav(e.target.checked)} />
-                Favourites
-              </label>
-            </div>
-<div className="atesto-progressbar">
+              <div className="atesto-progressbar">
                 <div className="atesto-progressbar-fill" style={{ width: `${globalProgress.pct}%` }} />
               </div>
             </div>
@@ -232,10 +191,10 @@ const pct = total > 0 ? Math.round((read / total) * 100) : 0;
                     <strong>{t.title}</strong>
                       <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                         {t.specialtyId && specialtyById.get(t.specialtyId) ? (
-                          <button type="button" className="atesto-badge atesto-badge-ok" title="Filtrovat podle specialty" onClick={() => { setSpecialtyId(t.specialtyId || ""); /*setDomainId("");*/ }}>{specialtyById.get(t.specialtyId)?.title}</button>
+                          <span className="atesto-badge atesto-badge-ok">{specialtyById.get(t.specialtyId)?.title}</span>
                         ) : null}
                         {t.domainId && domainById.get(t.domainId) ? (
-                          <button type="button" className="atesto-badge" title="Filtrovat podle domény" onClick={() => { setDomainId(t.domainId || ""); /*setSpecialtyId("");*/ }}>{domainById.get(t.domainId)?.title}</button>
+                          <span className="atesto-badge">{domainById.get(t.domainId)?.title}</span>
                         ) : null}
                       </div>
                   </div>
@@ -260,11 +219,6 @@ const pct = total > 0 ? Math.round((read / total) * 100) : 0;
                         <span className={it.status === "PUBLISHED" ? "atesto-badge atesto-badge-ok" : "atesto-badge"}>
                           {it.status}
                         </span>
-{" "}
-{readSet.has(it.slug) ? <span className="atesto-badge atesto-badge-ok">READ</span> : null}
-{it.kind ? <span className="atesto-badge">{it.kind}</span> : null}
-{it.source ? <span className="atesto-badge">{it.source}</span> : null}
-
                       </div>
                       <div className="atesto-qitem-sub">
                         <span className="atesto-subtle">{it.slug}</span>

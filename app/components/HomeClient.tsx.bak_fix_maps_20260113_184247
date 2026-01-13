@@ -52,18 +52,15 @@ const [query, setQuery] = useState("");
     setDomainId("");
   }, [specialtyId]);
 // lookup maps (MVP2 badges)
-  const specialtyById = useMemo(() => {
-    const m = new Map<string, any>();
-    for (const it of specialties || []) m.set(it.id, it);
+    for (const it of (specialties || [])) m.set(it.id, it);
     return m;
   }, [specialties]);
-
-  const domainById = useMemo(() => {
-    const m = new Map<string, any>();
-    for (const it of domains || []) m.set(it.id, it);
+    for (const it of (domains || [])) m.set(it.id, it);
     return m;
   }, [domains]);
-const [favSet, setFavSet] = useState<Set<string>>(new Set());
+
+
+  const [favSet, setFavSet] = useState<Set<string>>(new Set());
   const [readSet, setReadSet] = useState<Set<string>>(new Set());
 
   useEffect(() => {
