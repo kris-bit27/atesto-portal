@@ -122,6 +122,8 @@ const [favSet, setFavSet] = useState<Set<string>>(new Set());
                 </option>
               ))}
             </select>
+              <button type="button" className="atesto-btn" onClick={resetFilters}>Reset</button>
+
 
             <label className="atesto-subtle" style={{ display: "flex", gap: 8, alignItems: "center" }}>
               <input type="checkbox" checked={onlyPublished} onChange={(e) => setOnlyPublished(e.target.checked)} />
