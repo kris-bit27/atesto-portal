@@ -50,6 +50,7 @@ export default function HomeClient(props: Props) {
     setSpecialtyId,
     domainId,
     setDomainId,
+    resetFilters,
   } = useTaxonomyFilters({ defaultHideEmpty: true });
 
   // MVP2: když změníš specialty, resetni doménu (aby nevznikl prázdný filtr)
@@ -138,6 +139,9 @@ const pct = total > 0 ? Math.round((read / total) * 100) : 0;
               
 
             {/* Filters */}
+              <button type="button" className="atesto-btn" onClick={resetFilters} style={{ marginLeft: 6 }}>
+                Reset filtry
+              </button>
             <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
               {/* Specialty */}
               <select className="atesto-select" value={specialtyId} onChange={(e) => setSpecialtyId(e.target.value)}>

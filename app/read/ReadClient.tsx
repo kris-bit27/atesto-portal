@@ -56,9 +56,9 @@ export default function ReadClient({ topics, specialties = [], domains = [] }: P
     setSpecialtyId,
     domainId,
     setDomainId,
+    resetFilters,
   } = useTaxonomyFilters({ defaultHideEmpty: true });
-
-  useEffect(() => {
+useEffect(() => {
     if (specialtyId) setDomainId("");
   }, [specialtyId, setDomainId]);
 

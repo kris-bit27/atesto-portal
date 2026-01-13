@@ -38,9 +38,9 @@ export default function SearchClient({ questions, specialties = [], domains = []
     setSpecialtyId,
     domainId,
     setDomainId,
+    resetFilters,
   } = useTaxonomyFilters({ defaultHideEmpty: false });
-
-  const [favSet, setFavSet] = useState<Set<string>>(new Set());
+const [favSet, setFavSet] = useState<Set<string>>(new Set());
   const [readSet, setReadSet] = useState<Set<string>>(new Set());
 
   useEffect(() => {
