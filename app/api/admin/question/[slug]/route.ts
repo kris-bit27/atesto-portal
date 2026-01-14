@@ -10,6 +10,10 @@ export async function PATCH(req: Request, { params }: Params) {
 
   const title = typeof body.title === "string" ? body.title.trim() : undefined;
   const status = typeof body.status === "string" ? body.status.trim() : undefined;
+  const kind = typeof body.kind === "string" ? body.kind : undefined;
+  const source = typeof body.source === "string" ? body.source : undefined;
+  const partnerName = typeof body.partnerName === "string" ? body.partnerName : undefined;
+  const disclosure = typeof body.disclosure === "string" ? body.disclosure : undefined;
   const topicSlug = typeof body.topicSlug === "string" ? body.topicSlug.trim() : undefined;
 
   const data: any = {};

@@ -18,8 +18,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="cs">
       <body>
-        <Providers>
-<div className="mn-shell">
+        <div className="mn-shell">
           <Sidebar adminHref={adminHref} />
           <div className="mn-main">
             <div className="atesto-container atesto-shell">{children}</div>
@@ -28,7 +27,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 
         {/* AI Copilot (MVP2: napojíme na API + kontext stránky) */}
         <Copilot />
-</Providers>
       </body>
     </html>
   );

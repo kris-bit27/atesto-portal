@@ -1,4 +1,8 @@
+"use client";
+
 import Link from "next/link";
+import AuthButtons from "@/app/components/AuthButtons";
+import AuthButton from "@/app/components/AuthButton";
 
 export default function TopBar() {
   return (
@@ -14,8 +18,11 @@ export default function TopBar() {
           <Link className="atesto-pill" href="/search">Search</Link>
           <Link className="atesto-pill" href="/editor">Editor</Link>
           <Link className="atesto-pill" href="/admin">Admin</Link>
-        </nav>
+          <AuthButton />
+</nav>
       </div>
-    </div>
+    
+      <div style={{ marginLeft: "auto" }}><AuthButtons /></div>
+</div>
   );
 }
