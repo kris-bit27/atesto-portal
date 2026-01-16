@@ -1,7 +1,7 @@
 import prisma from "@/lib/prisma";
 import SearchClient from "./SearchClient";
 
-export const dynamic = "force-dynamic";
+export const revalidate = 60;
 
 export default async function SearchPage() {
   const [questions, specialties, domains] = await Promise.all([

@@ -2,7 +2,7 @@ import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import ReadClient from "@/app/read/[slug]/ReadClient";
 
-export const dynamic = "force-dynamic";
+export const revalidate = 60;
 
 type Params = { params: { slug: string } };
 

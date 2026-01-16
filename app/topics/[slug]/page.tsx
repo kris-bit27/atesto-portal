@@ -2,7 +2,7 @@ import prisma from "@/lib/prisma";
 import { notFound } from "next/navigation";
 import TopicClient from "./TopicClient";
 
-export const dynamic = "force-dynamic";
+export const revalidate = 60;
 
 type Params = { params: { slug: string } };
 
