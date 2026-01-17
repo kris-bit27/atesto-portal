@@ -40,6 +40,7 @@ model Specialty {
   updatedAt DateTime @updatedAt
 
   @@index([order])
+  @@index([isActive, order])
 }
 
 model Domain {
@@ -55,6 +56,7 @@ model Domain {
   updatedAt DateTime @updatedAt
 
   @@index([order])
+  @@index([isActive, order])
 }
 
 model Topic {
@@ -76,6 +78,7 @@ model Topic {
 
   @@index([specialtyId, order])
   @@index([domainId, order])
+  @@index([order, title])
 }
 
 model Question {
@@ -102,9 +105,11 @@ model Question {
   updatedAt DateTime @updatedAt
 
   @@index([topicId])
+  @@index([topicId, title])
   @@index([specialtyId])
   @@index([kind])
   @@index([source])
+  @@index([updatedAt, slug])
 }
 
 // =========================
@@ -123,6 +128,20 @@ model User {
 
   accounts Account[]
   sessions Session[]
+  progress UserProgress?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model UserProgress {
+  id             String    @id @default(cuid())
+  userId         String    @unique
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  readSlugs      String[]  @default([])
+  favSlugs       String[]  @default([])
+  lastOpenedSlug String?
+  lastOpenedAt   DateTime?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 
 const READ_KEY = "atesto_read_slugs";
+const LAST_OPENED_KEY = "atesto:lastOpened";
 const SRS_KEY = "atesto_srs_v1";
 
 function loadStringSet(key: string): Set<string> {
@@ -50,6 +51,11 @@ export default function ReadClient({ slug }: { slug: string }) {
   const [inReview, setInReview] = useState(false);
 
   useEffect(() => {
+    try {
+      window.localStorage.setItem(LAST_OPENED_KEY, JSON.stringify({ slug, at: Date.now() }));
+    } catch {
+      // ignore
+    }
     const rs = loadStringSet(READ_KEY);
     setIsRead(rs.has(slug));
 

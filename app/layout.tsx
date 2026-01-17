@@ -6,9 +6,8 @@ import type { Metadata } from "next";
 import Providers from "@/app/components/Providers";
 import TopBar from "@/app/components/TopBar";
 import Sidebar from "@/app/components/Sidebar";
-import dynamic from "next/dynamic";
-
-const Copilot = dynamic(() => import("@/app/components/copilot/Copilot"), { ssr: false });
+import CopilotLauncher from "@/app/components/copilot/CopilotLauncher";
+import ProgressSync from "@/app/components/ProgressSync";
 
 export const metadata: Metadata = {
   title: "MedNexus",
@@ -23,6 +22,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="cs">
       <body>
         <Providers>
+          <ProgressSync />
           <TopBar />
           <div className="mn-shell">
             <Sidebar adminHref={adminHref} />
@@ -32,7 +32,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           </div>
 
           {/* AI Copilot (MVP2: napojíme na API + kontext stránky) */}
-          <Copilot />
+          <CopilotLauncher />
         </Providers>
       </body>
     </html>
