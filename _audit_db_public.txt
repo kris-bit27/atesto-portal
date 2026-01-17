@@ -1,0 +1,58 @@
+=== Tables (public) ===
+ schemaname |     tablename      
+------------+--------------------
+ public     | Question
+ public     | Topic
+ public     | _prisma_migrations
+(3 rows)
+
+
+=== Topic columns ===
+               Table "public.Topic"
+ Column |  Type   | Collation | Nullable | Default 
+--------+---------+-----------+----------+---------
+ id     | text    |           | not null | 
+ title  | text    |           | not null | 
+ slug   | text    |           | not null | 
+ order  | integer |           | not null | 0
+Indexes:
+    "Topic_pkey" PRIMARY KEY, btree (id)
+    "Topic_slug_key" UNIQUE, btree (slug)
+Referenced by:
+    TABLE ""Question"" CONSTRAINT "Question_topicId_fkey" FOREIGN KEY ("topicId") REFERENCES "Topic"(id) ON UPDATE CASCADE ON DELETE RESTRICT
+
+
+=== Question columns ===
+                                    Table "public.Question"
+   Column    |              Type              | Collation | Nullable |         Default          
+-------------+--------------------------------+-----------+----------+--------------------------
+ id          | text                           |           | not null | 
+ topicId     | text                           |           | not null | 
+ title       | text                           |           | not null | 
+ slug        | text                           |           | not null | 
+ status      | "ContentStatus"                |           | not null | 'DRAFT'::"ContentStatus"
+ contentHtml | text                           |           | not null | ''::text
+ createdAt   | timestamp(3) without time zone |           | not null | CURRENT_TIMESTAMP
+ updatedAt   | timestamp(3) without time zone |           | not null | 
+Indexes:
+    "Question_pkey" PRIMARY KEY, btree (id)
+    "Question_slug_key" UNIQUE, btree (slug)
+Foreign-key constraints:
+    "Question_topicId_fkey" FOREIGN KEY ("topicId") REFERENCES "Topic"(id) ON UPDATE CASCADE ON DELETE RESTRICT
+
+
+=== Prisma migrations ===
+         migration_name         |          started_at           |          finished_at          | applied_steps_count | rolled_back_at 
+--------------------------------+-------------------------------+-------------------------------+---------------------+----------------
+ 20260111192902_baseline_realdb | 2026-01-11 20:05:51.976274+00 | 2026-01-11 20:05:51.976274+00 |                   0 | 
+ 20251226172314_init            | 2026-01-11 18:22:45.440029+00 | 2026-01-11 18:22:45.440029+00 |                   0 | 
+(2 rows)
+
+
+=== Enums (public) ===
+   enum_name   |   value   
+---------------+-----------
+ ContentStatus | DRAFT
+ ContentStatus | PUBLISHED
+(2 rows)
+

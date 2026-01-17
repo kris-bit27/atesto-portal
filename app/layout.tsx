@@ -1,23 +1,40 @@
 import "./globals.css";
-import { Inter } from "next/font/google";
+import "./atesto-ui.css";
 
-const inter = Inter({
-  subsets: ["latin"],
-});
+import type { Metadata } from "next";
 
-export const metadata = {
-  title: "Atesto portál",
-  description: "Atestační otázky – plastická chirurgie",
+import Providers from "@/app/components/Providers";
+import TopBar from "@/app/components/TopBar";
+import Sidebar from "@/app/components/Sidebar";
+import dynamic from "next/dynamic";
+
+const Copilot = dynamic(() => import("@/app/components/copilot/Copilot"), { ssr: false });
+
+export const metadata: Metadata = {
+  title: "MedNexus",
+  description: "Vzdělávací portál pro medicínu (MedNexus) + nástroje (MedVerse)",
 };
 
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
+  const adminKey = process.env.NEXT_PUBLIC_ADMIN_KEY || "";
+  const adminHref = adminKey ? `/admin?key=${encodeURIComponent(adminKey)}` : "/admin";
+
   return (
     <html lang="cs">
-      <body className={inter.className}>{children}</body>
+      <body>
+        <Providers>
+          <TopBar />
+          <div className="mn-shell">
+            <Sidebar adminHref={adminHref} />
+            <div className="mn-main">
+              <div className="atesto-container atesto-shell">{children}</div>
+            </div>
+          </div>
+
+          {/* AI Copilot (MVP2: napojíme na API + kontext stránky) */}
+          <Copilot />
+        </Providers>
+      </body>
     </html>
   );
 }

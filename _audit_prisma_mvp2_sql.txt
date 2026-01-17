@@ -1,0 +1,11 @@
+=== C) Tables (public) ===
+Script executed successfully.
+
+=== C2) Columns: Topic ===
+Script executed successfully.
+
+=== C3) Columns: Question ===
+Script executed successfully.
+
+=== D) _prisma_migrations (last 20) ===
+Script executed successfully.

@@ -1,0 +1,112 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+  shadowDatabaseUrl = env("SHADOW_DATABASE_URL")
+}
+
+enum ContentStatus {
+  DRAFT
+  PUBLISHED
+}
+
+// MVP2/3: typ obsahu (v MVP1 používáme primárně ANSWER)
+enum ContentKind {
+  ANSWER
+  FLASHCARDS
+  MCQ
+  ALGORITHM
+  CHECKLIST
+  CASE
+}
+
+// MVP2/3: původ obsahu (core vs. industry-supported education)
+enum SourceType {
+  CORE
+  INDUSTRY
+}
+
+model Specialty {
+  id        String   @id @default(cuid())
+  title     String
+  slug      String   @unique
+  order     Int      @default(0)
+  isActive  Boolean  @default(true)
+
+  topics    Topic[]
+  questions Question[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([order])
+}
+
+model Domain {
+  id        String   @id @default(cuid())
+  title     String
+  slug      String   @unique
+  order     Int      @default(0)
+  isActive  Boolean  @default(true)
+
+  topics    Topic[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([order])
+}
+
+model Topic {
+  id          String     @id @default(cuid())
+  title       String
+  slug        String     @unique
+  order       Int        @default(0)
+
+  specialtyId String?
+  specialty   Specialty? @relation(fields: [specialtyId], references: [id])
+
+  domainId    String?
+  domain      Domain?    @relation(fields: [domainId], references: [id])
+
+  questions   Question[]
+
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  @@index([specialtyId, order])
+  @@index([domainId, order])
+}
+
+model Question {
+  id          String        @id @default(cuid())
+  topicId     String
+  topic       Topic         @relation(fields: [topicId], references: [id])
+
+  specialtyId String?
+  specialty   Specialty?    @relation(fields: [specialtyId], references: [id])
+
+  title       String
+  slug        String        @unique
+
+  status      ContentStatus @default(DRAFT)
+
+  kind        ContentKind   @default(ANSWER)
+  source      SourceType    @default(CORE)
+
+  contentHtml String        @default("")
+
+  partnerName String?
+  disclosure  String?
+
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  @@index([topicId])
+  @@index([specialtyId])
+  @@index([kind])
+  @@index([source])
+}

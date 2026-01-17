@@ -7,27 +7,162 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model Topic {
-  id        String     @id @default(cuid())
-  title     String
-  slug      String     @unique
-  order     Int        @default(0)
-  questions Question[]
-}
-
-model Question {
-  id          String        @id @default(cuid())
-  topicId     String
-  topic       Topic         @relation(fields: [topicId], references: [id])
-  title       String
-  slug        String        @unique
-  status      ContentStatus @default(DRAFT)
-  contentHtml String        @default("")
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
-}
-
 enum ContentStatus {
   DRAFT
   PUBLISHED
+}
+
+enum ContentKind {
+  ANSWER
+  FLASHCARDS
+  MCQ
+  ALGORITHM
+  CHECKLIST
+  CASE
+}
+
+enum SourceType {
+  CORE
+  INDUSTRY
+}
+
+model Specialty {
+  id       String  @id @default(cuid())
+  title    String
+  slug     String  @unique
+  order    Int     @default(0)
+  isActive Boolean @default(true)
+
+  topics    Topic[]
+  questions Question[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([order])
+}
+
+model Domain {
+  id       String  @id @default(cuid())
+  title    String
+  slug     String  @unique
+  order    Int     @default(0)
+  isActive Boolean @default(true)
+
+  topics Topic[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([order])
+}
+
+model Topic {
+  id    String @id @default(cuid())
+  title String
+  slug  String @unique
+  order Int    @default(0)
+
+  specialtyId String?
+  specialty   Specialty? @relation(fields: [specialtyId], references: [id])
+
+  domainId String?
+  domain   Domain? @relation(fields: [domainId], references: [id])
+
+  questions Question[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([specialtyId, order])
+  @@index([domainId, order])
+}
+
+model Question {
+  id      String @id @default(cuid())
+  topicId String
+  topic   Topic  @relation(fields: [topicId], references: [id])
+
+  specialtyId String?
+  specialty   Specialty? @relation(fields: [specialtyId], references: [id])
+
+  title  String
+  slug   String        @unique
+  status ContentStatus @default(DRAFT)
+
+  kind   ContentKind @default(ANSWER)
+  source SourceType  @default(CORE)
+
+  contentHtml String @default("")
+
+  partnerName String?
+  disclosure  String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([topicId])
+  @@index([specialtyId])
+  @@index([kind])
+  @@index([source])
+}
+
+// =========================
+// Auth (NextAuth/Auth.js) + Prisma
+// =========================
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String?   @unique
+  emailVerified DateTime?
+  image         String?
+
+  // Credentials login (simple MVP)
+  passwordHash String?
+
+  accounts Account[]
+  sessions Session[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
 }

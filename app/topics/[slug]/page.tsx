@@ -1,49 +1,34 @@
-import Link from "next/link";
 import prisma from "@/lib/prisma";
+import { notFound } from "next/navigation";
 import TopicClient from "./TopicClient";
 
-export const dynamic = "force-dynamic";
+export const revalidate = 60;
 
-type PageProps = { params: { slug: string } };
+type Params = { params: { slug: string } };
 
-export default async function TopicPage({ params }: PageProps) {
+export default async function TopicPage({ params }: Params) {
   const topic = await prisma.topic.findUnique({
     where: { slug: params.slug },
     select: {
-      slug: true,
+      id: true,
       title: true,
+      slug: true,
       order: true,
+      specialtyId: true,
+      domainId: true,
       questions: {
-        orderBy: { createdAt: "asc" },
+        orderBy: { title: "asc" },
         select: { slug: true, title: true, status: true },
       },
     },
   });
 
-  if (!topic) {
-    return (
-      <main style={{ padding: 20 }}>
-        <h1>Téma nenalezeno</h1>
-        <p>Slug: {params.slug}</p>
-        <Link href="/">← Zpět</Link>
-      </main>
-    );
-  }
+  if (!topic) return notFound();
 
-  return (
-    <main style={{ display: "grid", gap: 12 }}>
-      <nav style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-        <Link href="/" style={{ opacity: 0.9 }}>
-          ← Témata
-        </Link>
-        <span style={{ opacity: 0.5 }}>/</span>
-        <span style={{ opacity: 0.9 }}>
-          {topic.order}. {topic.title}
-        </span>
-      </nav>
+  const [specialties, domains] = await Promise.all([
+    prisma.specialty.findMany({ orderBy: { order: "asc" }, select: { id: true, slug: true, title: true, order: true } }),
+    prisma.domain.findMany({ orderBy: { order: "asc" }, select: { id: true, slug: true, title: true, order: true } }),
+  ]);
 
-      {/* Client část: filtry + progress + seznam */}
-      <TopicClient questions={topic.questions} topicTitle={`${topic.order}. ${topic.title}`} />
-    </main>
-  );
+  return <TopicClient topic={topic as any} specialties={specialties as any} domains={domains as any} />;
 }
