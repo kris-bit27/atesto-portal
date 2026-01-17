@@ -86,13 +86,16 @@ export default function ProgressSync() {
         const remote = res.ok ? data : null;
 
         const mergedRead = new Set<string>(localRead);
-        for (const s of Array.isArray(remote?.readSlugs) ? remote.readSlugs : []) mergedRead.add(s);
+        for (const s of Array.isArray(remote?.read) ? remote.read : []) mergedRead.add(s);
 
         const mergedFav = new Set<string>(localFav);
-        for (const s of Array.isArray(remote?.favSlugs) ? remote.favSlugs : []) mergedFav.add(s);
+        for (const s of Array.isArray(remote?.fav) ? remote.fav : []) mergedFav.add(s);
 
-        const remoteLast = remote?.lastOpenedSlug
-          ? { slug: remote.lastOpenedSlug as string, at: new Date(remote?.lastOpenedAt).getTime() }
+        const remoteLast = remote?.lastOpened?.slug
+          ? {
+              slug: remote.lastOpened.slug as string,
+              at: remote.lastOpened.at ? new Date(remote.lastOpened.at).getTime() : 0,
+            }
           : null;
         const bestLast =
           localLast && remoteLast
@@ -134,7 +137,7 @@ export default function ProgressSync() {
       void fetch("/api/me/progress", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ opened: { slug: detail.slug } }),
+        body: JSON.stringify({ lastOpened: { slug: detail.slug } }),
       });
     };
     window.addEventListener("atesto-read-updated", onUpdate);

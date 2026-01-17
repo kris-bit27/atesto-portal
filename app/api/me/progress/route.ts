@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 
 type TogglePayload = { slug: string; value?: boolean };
 type OpenPayload = { slug: string };
+type LastOpenedPayload = { slug: string; at?: string };
 
 function asStringArray(value: unknown): string[] {
   if (!Array.isArray(value)) return [];
@@ -44,10 +45,11 @@ export async function GET() {
   ]);
 
   return NextResponse.json({
-    readSlugs: readRows.map((r: { questionSlug: string }) => r.questionSlug),
-    favSlugs: favRows.map((r: { questionSlug: string }) => r.questionSlug),
-    lastOpenedSlug: lastOpened?.questionSlug ?? null,
-    lastOpenedAt: lastOpened?.lastOpenedAt ?? null,
+    read: readRows.map((r: { questionSlug: string }) => r.questionSlug),
+    fav: favRows.map((r: { questionSlug: string }) => r.questionSlug),
+    lastOpened: lastOpened
+      ? { slug: lastOpened.questionSlug, at: lastOpened.lastOpenedAt }
+      : null,
   });
 }
 
@@ -59,6 +61,7 @@ export async function POST(req: Request) {
   const read = body?.read as TogglePayload | undefined;
   const fav = body?.fav as TogglePayload | undefined;
   const opened = body?.opened as OpenPayload | undefined;
+  const lastOpened = body?.lastOpened as LastOpenedPayload | undefined;
   const sync = body?.sync as { readSlugs?: string[]; favSlugs?: string[] } | undefined;
 
   const ops: any[] = [];
@@ -83,12 +86,17 @@ export async function POST(req: Request) {
     );
   }
 
-  if (opened?.slug) {
+  const openedSlug = lastOpened?.slug || opened?.slug;
+  if (openedSlug) {
+    const openedAt =
+      lastOpened?.at && !Number.isNaN(Date.parse(lastOpened.at))
+        ? new Date(lastOpened.at)
+        : new Date();
     ops.push(
       prisma.userQuestionProgress.upsert({
-        where: { userId_questionSlug: { userId, questionSlug: opened.slug } },
-        create: { userId, questionSlug: opened.slug, lastOpenedAt: new Date() },
-        update: { lastOpenedAt: new Date() },
+        where: { userId_questionSlug: { userId, questionSlug: openedSlug } },
+        create: { userId, questionSlug: openedSlug, lastOpenedAt: openedAt },
+        update: { lastOpenedAt: openedAt },
       })
     );
   }
