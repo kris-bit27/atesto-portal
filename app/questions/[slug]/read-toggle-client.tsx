@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 
 const READ_KEY = "atesto_read_slugs";
-const LAST_OPENED_KEY = "atesto:lastOpened";
 
 function loadReadSet(): Set<string> {
   try {
@@ -27,11 +26,7 @@ export default function ReadToggleClient({ slug }: { slug: string }) {
   const [isRead, setIsRead] = useState(false);
 
   useEffect(() => {
-    try {
-      window.localStorage.setItem(LAST_OPENED_KEY, JSON.stringify({ slug, at: Date.now() }));
-    } catch {
-      // ignore
-    }
+    window.dispatchEvent(new CustomEvent("atesto-opened", { detail: { slug } }));
     const s = loadReadSet();
     setIsRead(s.has(slug));
   }, [slug]);

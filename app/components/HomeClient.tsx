@@ -73,8 +73,9 @@ export default function HomeClient(props: Props) {
     return m;
   }, [domains]);
 
-const [favSet, setFavSet] = useState<Set<string>>(new Set());
+  const [favSet, setFavSet] = useState<Set<string>>(new Set());
   const [readSet, setReadSet] = useState<Set<string>>(new Set());
+  const [lastOpenedSlug, setLastOpenedSlug] = useState<string | null>(null);
 
   useEffect(() => {
     setFavSet(getSet("atesto:favs"));
@@ -87,14 +88,37 @@ const [favSet, setFavSet] = useState<Set<string>>(new Set());
     return () => window.removeEventListener("storage", onStorage);
   }, []);
 
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const readLastOpened = () => {
+      try {
+        const marker = window.localStorage.getItem("atesto:authProgress");
+        if (!marker) return setLastOpenedSlug(null);
+        const raw = window.localStorage.getItem("atesto:lastOpened");
+        if (!raw) return setLastOpenedSlug(null);
+        const obj = JSON.parse(raw) as { slug?: string };
+        setLastOpenedSlug(typeof obj?.slug === "string" ? obj.slug : null);
+      } catch {
+        setLastOpenedSlug(null);
+      }
+    };
+    readLastOpened();
+    const onStorage = () => readLastOpened();
+    const onOpened = () => readLastOpened();
+    window.addEventListener("storage", onStorage);
+    window.addEventListener("atesto-opened", onOpened as EventListener);
+    return () => {
+      window.removeEventListener("storage", onStorage);
+      window.removeEventListener("atesto-opened", onOpened as EventListener);
+    };
+  }, []);
+
   const allQuestions = useMemo(() => topics.flatMap((t) => t.questions || []), [topics]);
 
   const globalProgress = useMemo(() => {
     const total = allQuestions.length;
     const read = allQuestions.reduce((acc, it) => acc + (readSet.has(it.slug) ? 1 : 0), 0);
-
-
-const pct = total > 0 ? Math.round((read / total) * 100) : 0;
+    const pct = total > 0 ? Math.round((read / total) * 100) : 0;
     return { total, read, pct };
   }, [allQuestions, readSet]);
 
@@ -125,6 +149,7 @@ const pct = total > 0 ? Math.round((read / total) * 100) : 0;
   const nextUnreadSlug = useMemo(() => {
     return pickNextUnread(filteredTopics as any, readSet);
   }, [filteredTopics, readSet]);
+  const continueSlug = lastOpenedSlug || nextUnreadSlug;
 
 
   return (
@@ -135,31 +160,7 @@ const pct = total > 0 ? Math.round((read / total) * 100) : 0;
             Atesto portál
           </h1>
           <div className="atesto-subtle">Učení podle témat • progress • rychlé vyhledávání</div>
-        
-            {/* DEBUG_CONTINUE_BANNER */}
-            <div
-              style={{
-                marginTop: 10,
-                padding: 10,
-                border: "2px solid #ff3b30",
-                borderRadius: 12,
-                background: "rgba(255,59,48,0.08)",
-                display: "flex",
-                gap: 10,
-                flexWrap: "wrap",
-                alignItems: "center",
-              }}
-            >
-              <b>Continue:</b>
-              {nextUnreadSlug ? (
-                <Link className="atesto-btn" href={`/questions/${nextUnreadSlug}`}>
-                  Continue reading →
-                </Link>
-              ) : (
-                <span>Žádná další nepřečtená (nebo prázdný filtr).</span>
-              )}
-            </div>
-</div>
+        </div>
 
         <div className="atesto-card-inner atesto-stack">
           <div className="atesto-progress">
@@ -167,85 +168,24 @@ const pct = total > 0 ? Math.round((read / total) * 100) : 0;
               <div>
                 Celkem přečteno <b>{globalProgress.read}</b> / <b>{globalProgress.total}</b> ({globalProgress.pct}%)
               </div>
-              
-
-            {/* Filters */}
               <button type="button" className="atesto-btn" onClick={resetFilters} style={{ marginLeft: 6 }}>
                 Reset filtry
               </button>
-            <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-              {/* Specialty */}
-              <select className="atesto-select" value={specialtyId} onChange={(e) => setSpecialtyId(e.target.value)}>
-                <option value="">All specialties</option>
-                {specialties.map((sp) => (
-                  <option key={sp.id} value={sp.id}>
-                    {sp.title}
-                  </option>
-                ))}
-              </select>
-
-              {/* Domain */}
-              <select className="atesto-select" value={domainId} onChange={(e) => setDomainId(e.target.value)}>
-                <option value="">All domains</option>
-                {domains.map((d) => (
-                  <option key={d.id} value={d.id}>
-                    {d.title}
-                  </option>
-                ))}
-              </select>
-
-              {/* Quick toggles */}
-              <label className="atesto-checkbox">
-                <input type="checkbox" checked={onlyPublished} onChange={(e) => setOnlyPublished(e.target.checked)} />
-                Published only
-              </label>
-
-              <label className="atesto-checkbox">
-                <input type="checkbox" checked={onlyFav} onChange={(e) => setOnlyFav(e.target.checked)} />
-                Favourites
-              </label>
             </div>
-<div className="atesto-progressbar">
-                <div className="atesto-progressbar-fill" style={{ width: `${globalProgress.pct}%` }} />
-              </div>
+
+            <div className="atesto-progressbar">
+              <div className="atesto-progressbar-fill" style={{ width: `${globalProgress.pct}%` }} />
             </div>
-              
-              <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center", marginTop: 10 }}>
-                {nextUnreadSlug ? (
-                  <Link className="atesto-btn" href={`/questions/${nextUnreadSlug}`}>
-                    Continue reading →
-                  </Link>
-                ) : (
-                  <span className="atesto-subtle">✅ Vše v aktuálním filtru přečteno</span>
-                )}
-                <button type="button" className="atesto-btn atesto-btn-ghost" onClick={resetFilters}>
-                  Reset filtry
-                </button>
-              </div>
-<div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center", marginTop: 10 }}>
-                {nextUnreadSlug ? (
-                  <Link className="atesto-btn" href={`/questions/${nextUnreadSlug}`}>
-                    Continue reading →
-                  </Link>
-                ) : (
-                  <span className="atesto-subtle">✅ Vše v aktuálním filtru přečteno</span>
-                )}
-              </div>
 
-
-            {/* FILTERS */}
-
-              {/* Continue reading (B1) */}
-              <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center", marginTop: 10 }}>
-                {nextUnreadSlug ? (
-                  <Link className="atesto-btn" href={`/questions/${nextUnreadSlug}`}>
-                    Continue reading →
-                  </Link>
-                ) : (
-                  <span className="atesto-subtle">✅ Vše v aktuálním filtru přečteno</span>
-                )}
-              </div>
-
+            <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center", marginTop: 10 }}>
+              {continueSlug ? (
+                <Link className="atesto-btn" href={`/questions/${continueSlug}`}>
+                  Continue reading →
+                </Link>
+              ) : (
+                <span className="atesto-subtle">✅ Vše v aktuálním filtru přečteno</span>
+              )}
+            </div>
 
             <div className="atesto-filters">
               {/* MVP2: Specialty + Domain */}
