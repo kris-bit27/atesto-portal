@@ -53,7 +53,7 @@ export default function ProgressSync() {
   const initializedRef = useRef(false);
 
   useEffect(() => {
-    if (status !== "authenticated" || !session?.user?.id) return;
+    if (status !== "authenticated") return;
     if (initializedRef.current) return;
     initializedRef.current = true;
 
@@ -116,7 +116,7 @@ export default function ProgressSync() {
       window.removeEventListener("atesto-favs-updated", onUpdate);
       window.removeEventListener("focus", onUpdate);
     };
-  }, [session?.user?.id, status]);
+  }, [session?.user?.email, status]);
 
   return null;
 }

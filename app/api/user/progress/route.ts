@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
+import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { prisma } from "@/lib/prisma";
 
@@ -13,18 +13,22 @@ function parseStringArray(value: unknown): string[] {
 }
 
 export async function GET() {
-  const session = await getServerSession(authOptions);
-  const userId = session?.user?.id;
-  if (!userId) return NextResponse.json({ ok: false }, { status: 401 });
+  const session = (await getServerSession(authOptions as any)) as any;
+  const email = session?.user?.email || null;
+  if (!email) return NextResponse.json({ ok: false }, { status: 401 });
+  const user = await prisma.user.findUnique({ where: { email }, select: { id: true } });
+  if (!user) return NextResponse.json({ ok: false }, { status: 404 });
 
-  const progress = await prisma.userProgress.findUnique({ where: { userId } });
+  const progress = await prisma.userProgress.findUnique({ where: { userId: user.id } });
   return NextResponse.json({ ok: true, progress });
 }
 
 export async function POST(req: Request) {
-  const session = await getServerSession(authOptions);
-  const userId = session?.user?.id;
-  if (!userId) return NextResponse.json({ ok: false }, { status: 401 });
+  const session = (await getServerSession(authOptions as any)) as any;
+  const email = session?.user?.email || null;
+  if (!email) return NextResponse.json({ ok: false }, { status: 401 });
+  const user = await prisma.user.findUnique({ where: { email }, select: { id: true } });
+  if (!user) return NextResponse.json({ ok: false }, { status: 404 });
 
   const body = await req.json().catch(() => ({}));
   const readSlugs = parseStringArray(body?.readSlugs);
@@ -39,9 +43,9 @@ export async function POST(req: Request) {
       : null;
 
   const progress = await prisma.userProgress.upsert({
-    where: { userId },
+    where: { userId: user.id },
     create: {
-      userId,
+      userId: user.id,
       readSlugs,
       favSlugs,
       lastOpenedSlug,
