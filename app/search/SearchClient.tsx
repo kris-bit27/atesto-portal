@@ -13,6 +13,7 @@ type Q = {
   subcategoryId?: string | null;
 };
 type Tax = { id: string; slug: string; title: string; order?: number };
+type SubTax = Tax & { categoryId: string };
 
 type Props = {
   questions: (Q & { specialtyId?: string | null; domainId?: string | null })[];
@@ -98,8 +99,8 @@ export default function SearchClient({ questions, specialties = [], domains = []
   }, [categories]);
 
   const subcategoryById = useMemo(() => {
-    const m = new Map<string, Tax>();
-    for (const it of subcategories || []) m.set(it.id, it);
+    const m = new Map<string, SubTax>();
+    for (const it of subcategories || []) m.set(it.id, it as SubTax);
     return m;
   }, [subcategories]);
 
@@ -107,6 +108,17 @@ export default function SearchClient({ questions, specialties = [], domains = []
     if (!categoryId) return subcategories;
     return subcategories.filter((s) => s.categoryId === categoryId);
   }, [subcategories, categoryId]);
+
+  const applyCategoryFilter = (id: string) => {
+    setCategoryId(id);
+    setSubcategoryId("");
+  };
+
+  const applySubcategoryFilter = (id: string) => {
+    setSubcategoryId(id);
+    const sub = subcategoryById.get(id);
+    if (!categoryId && sub?.categoryId) setCategoryId(sub.categoryId);
+  };
 
   const filtered = useMemo(() => {
     return (items || [])
@@ -267,10 +279,28 @@ export default function SearchClient({ questions, specialties = [], domains = []
                         <span className="atesto-badge">{domainById.get(x.domainId)?.title}</span>
                       ) : null}
                       {x.categoryId && categoryById.get(x.categoryId) ? (
-                        <span className="atesto-badge">{categoryById.get(x.categoryId)?.title}</span>
+                        <button
+                          type="button"
+                          className="atesto-badge"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            applyCategoryFilter(x.categoryId as string);
+                          }}
+                        >
+                          {categoryById.get(x.categoryId)?.title}
+                        </button>
                       ) : null}
                       {x.subcategoryId && subcategoryById.get(x.subcategoryId) ? (
-                        <span className="atesto-badge">{subcategoryById.get(x.subcategoryId)?.title}</span>
+                        <button
+                          type="button"
+                          className="atesto-badge"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            applySubcategoryFilter(x.subcategoryId as string);
+                          }}
+                        >
+                          {subcategoryById.get(x.subcategoryId)?.title}
+                        </button>
                       ) : null}
                       {x.topic?.title ? <span className="atesto-subtle">• {x.topic.title}</span> : null}
                     </div>

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { useTaxonomyFilters } from "@/app/lib/useTaxonomyFilters";
 type Q = { slug: string; title: string; status: "DRAFT" | "PUBLISHED"; categoryId?: string | null; subcategoryId?: string | null };
@@ -16,7 +16,7 @@ type Topic = {
   questions: Q[];
 };
 
-type Tax = { id: string; slug: string; title: string; order?: number; isActive?: boolean };
+type Tax = { id: string; slug: string; title: string; order?: number; isActive?: boolean; _count?: { questions?: number } };
 
 type Props = {
   topics: Topic[];
@@ -73,16 +73,13 @@ export default function ReadClient({ topics, specialties = [], domains = [], cat
     if (categoryId) setSubcategoryId("");
   }, [categoryId, setSubcategoryId]);
 
-  const initFromQueryRef = useRef(false);
   useEffect(() => {
-    if (initFromQueryRef.current) return;
     if (!searchParams) return;
     const cat = searchParams.get("categoryId") || "";
     const sub = searchParams.get("subcategoryId") || "";
-    if (cat) setCategoryId(cat);
-    if (sub) setSubcategoryId(sub);
-    initFromQueryRef.current = true;
-  }, [searchParams, setCategoryId, setSubcategoryId, initFromQueryRef]);
+    setCategoryId(cat);
+    setSubcategoryId(sub);
+  }, [searchParams, setCategoryId, setSubcategoryId]);
 
   const [favSet, setFavSet] = useState<Set<string>>(new Set());
   const [readSet, setReadSet] = useState<Set<string>>(new Set());
@@ -112,9 +109,20 @@ export default function ReadClient({ topics, specialties = [], domains = [], cat
     return m;
   }, [domains]);
 
+  const categoryQuestionCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const t of topics) {
+      for (const q of t.questions || []) {
+        if (!q.categoryId) continue;
+        counts.set(q.categoryId, (counts.get(q.categoryId) || 0) + 1);
+      }
+    }
+    return counts;
+  }, [topics]);
+
   const activeCategories = useMemo(() => {
-    return categories.filter((c) => c.isActive !== false);
-  }, [categories]);
+    return categories.filter((c) => c.isActive !== false && (categoryQuestionCounts.get(c.id) || 0) > 0);
+  }, [categories, categoryQuestionCounts]);
 
   const activeSubcategories = useMemo(() => {
     return subcategories.filter((s) => s.isActive !== false);
@@ -131,6 +139,17 @@ export default function ReadClient({ topics, specialties = [], domains = [], cat
     for (const it of activeSubcategories) m.set(it.id, it as Tax & { categoryId: string });
     return m;
   }, [activeSubcategories]);
+
+  const applyCategoryFilter = (id: string) => {
+    setCategoryId(id);
+    setSubcategoryId("");
+  };
+
+  const applySubcategoryFilter = (id: string) => {
+    setSubcategoryId(id);
+    const sub = subcategoryById.get(id);
+    if (!categoryId && sub?.categoryId) setCategoryId(sub.categoryId);
+  };
 
   const filteredSubcategories = useMemo(() => {
     const list = activeSubcategories;
@@ -252,6 +271,55 @@ export default function ReadClient({ topics, specialties = [], domains = [], cat
               ) : null}
             </div>
             <div className="atesto-subtle">{t.slug}</div>
+            {(() => {
+              const catCounts = new Map<string, number>();
+              const subCounts = new Map<string, number>();
+              for (const q of t.questions || []) {
+                if (q.categoryId) catCounts.set(q.categoryId, (catCounts.get(q.categoryId) || 0) + 1);
+                if (q.subcategoryId) subCounts.set(q.subcategoryId, (subCounts.get(q.subcategoryId) || 0) + 1);
+              }
+              const topCategories = Array.from(catCounts.entries())
+                .sort((a, b) => b[1] - a[1])
+                .slice(0, 2)
+                .map(([id]) => ({ id, title: categoryById.get(id)?.title }))
+                .filter((it) => it.title);
+              const topSubcategories = Array.from(subCounts.entries())
+                .sort((a, b) => b[1] - a[1])
+                .slice(0, 2)
+                .map(([id]) => ({ id, title: subcategoryById.get(id)?.title }))
+                .filter((it) => it.title);
+              if (topCategories.length === 0 && topSubcategories.length === 0) return null;
+              return (
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 6 }}>
+                  {topCategories.map((c) => (
+                    <button
+                      key={c.id}
+                      type="button"
+                      className="atesto-badge atesto-badge-ok"
+                      onClick={() => {
+                        applyCategoryFilter(c.id);
+                        window.scrollTo({ top: 0, behavior: "smooth" });
+                      }}
+                    >
+                      {c.title}
+                    </button>
+                  ))}
+                  {topSubcategories.map((s) => (
+                    <button
+                      key={s.id}
+                      type="button"
+                      className="atesto-badge"
+                      onClick={() => {
+                        applySubcategoryFilter(s.id);
+                        window.scrollTo({ top: 0, behavior: "smooth" });
+                      }}
+                    >
+                      {s.title}
+                    </button>
+                  ))}
+                </div>
+              );
+            })()}
           </div>
         </div>
 
@@ -285,8 +353,7 @@ export default function ReadClient({ topics, specialties = [], domains = [], cat
                           className="atesto-badge atesto-badge-ok"
                           onClick={(e) => {
                             e.preventDefault();
-                            setCategoryId(q.categoryId as string);
-                            setSubcategoryId("");
+                            applyCategoryFilter(q.categoryId as string);
                             window.scrollTo({ top: 0, behavior: "smooth" });
                           }}
                         >
@@ -299,10 +366,7 @@ export default function ReadClient({ topics, specialties = [], domains = [], cat
                           className="atesto-badge"
                           onClick={(e) => {
                             e.preventDefault();
-                            setSubcategoryId(q.subcategoryId as string);
-                            if (!categoryId && subcategory.categoryId) {
-                              setCategoryId(subcategory.categoryId);
-                            }
+                            applySubcategoryFilter(q.subcategoryId as string);
                             window.scrollTo({ top: 0, behavior: "smooth" });
                           }}
                         >

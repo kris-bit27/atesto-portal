@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState, type DragEvent } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { loadReadList, loadReadSet, pickMostRecentRead, pickNextUnread } from "@/app/lib/continue";
 import { listDue } from "@/app/lib/srs";
 type Topic = {
@@ -52,19 +52,7 @@ export default function HomeClient(props: Props) {
   const [dueNowItems, setDueNowItems] = useState<{ slug: string; dueAt: number }[]>([]);
   const [sparkCounts, setSparkCounts] = useState<number[]>([]);
   const [readsByDay, setReadsByDay] = useState<{ date: string; count: number }[]>([]);
-  const [layoutEnabled, setLayoutEnabled] = useState(false);
-  const [layoutOrder, setLayoutOrder] = useState<string[]>([]);
   const prevReadCountRef = useRef(0);
-  const dragIdRef = useRef<string | null>(null);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    try {
-      const raw = window.localStorage.getItem("mn:dashboardLayout:v1");
-      const arr = raw ? JSON.parse(raw) : [];
-      if (Array.isArray(arr)) setLayoutOrder(arr.filter((x) => typeof x === "string"));
-    } catch {}
-  }, []);
 
   useEffect(() => {
     setReadSet(loadReadSet());
@@ -385,13 +373,19 @@ export default function HomeClient(props: Props) {
   const activeCategories = useMemo(() => categories.filter((c) => c.isActive !== false), [categories]);
   const activeSubcategories = useMemo(() => subcategories.filter((s) => s.isActive !== false), [subcategories]);
   const categoryStats = useMemo(() => {
-    return activeCategories.map((c) => {
-      const items = allQuestions.filter((q) => q.categoryId === c.id);
-      const total = items.length;
-      const read = items.reduce((acc, q) => acc + (readSet.has(q.slug) ? 1 : 0), 0);
-      const pct = total > 0 ? Math.round((read / total) * 100) : 0;
-      return { id: c.id, title: c.title, total, read, pct };
-    });
+    return activeCategories
+      .map((c) => {
+        const items = allQuestions.filter((q) => q.categoryId === c.id);
+        const total = items.length;
+        const read = items.reduce((acc, q) => acc + (readSet.has(q.slug) ? 1 : 0), 0);
+        const pct = total > 0 ? Math.round((read / total) * 100) : 0;
+        return { id: c.id, title: c.title, total, read, pct };
+      })
+      .filter((c) => c.total > 0)
+      .sort((a, b) => {
+        if (b.pct !== a.pct) return b.pct - a.pct;
+        return b.total - a.total;
+      });
   }, [activeCategories, allQuestions, readSet]);
 
   const subcategoryStats = useMemo(() => {
@@ -836,48 +830,7 @@ export default function HomeClient(props: Props) {
     ]
   );
 
-  const orderedModules = useMemo(() => {
-    const base = modules.map((m) => m.id);
-    const order = layoutEnabled && layoutOrder.length ? layoutOrder : base;
-    const map = new Map(modules.map((m) => [m.id, m]));
-    const list = order.map((id) => map.get(id)).filter(Boolean) as DashboardModule[];
-    for (const m of modules) if (!order.includes(m.id)) list.push(m);
-    return list;
-  }, [modules, layoutEnabled, layoutOrder]);
-
-  useEffect(() => {
-    if (!layoutEnabled) return;
-    if (typeof window === "undefined") return;
-    try {
-      const next = layoutOrder.length ? layoutOrder : modules.map((m) => m.id);
-      window.localStorage.setItem("mn:dashboardLayout:v1", JSON.stringify(next));
-    } catch {}
-  }, [layoutEnabled, layoutOrder, modules]);
-
-  const handleDrop = (targetId: string) => (e: DragEvent<HTMLDivElement>) => {
-    if (!layoutEnabled) return;
-    e.preventDefault();
-    const dragId = dragIdRef.current || e.dataTransfer.getData("text/plain");
-    if (!dragId || dragId === targetId) return;
-    const base = layoutOrder.length ? layoutOrder : modules.map((m) => m.id);
-    const next = base.filter((id) => id !== dragId);
-    const idx = next.indexOf(targetId);
-    next.splice(idx < 0 ? next.length : idx, 0, dragId);
-    setLayoutOrder(next);
-  };
-
-  const handleDragStart = (id: string) => (e: DragEvent<HTMLDivElement>) => {
-    if (!layoutEnabled) return;
-    dragIdRef.current = id;
-    e.dataTransfer.effectAllowed = "move";
-    e.dataTransfer.setData("text/plain", id);
-  };
-
-  const handleDragOver = (e: DragEvent<HTMLDivElement>) => {
-    if (!layoutEnabled) return;
-    e.preventDefault();
-    e.dataTransfer.dropEffect = "move";
-  };
+  const orderedModules = modules;
 
   return (
     <main className="atesto-container">
@@ -894,15 +847,7 @@ export default function HomeClient(props: Props) {
           </div>
 
           <div className="atesto-card-inner atesto-stack">
-            <div style={{ display: "flex", justifyContent: "flex-end" }}>
-              <button
-                className="atesto-btn atesto-btn-ghost"
-                type="button"
-                onClick={() => setLayoutEnabled((v) => !v)}
-              >
-                {layoutEnabled ? "Done" : "Customize layout"}
-              </button>
-            </div>
+            {/* TODO: optional drag & drop dashboard layout */}
             <div className="atesto-progress">
               <div className="atesto-progress-row">
                 <div>
@@ -928,23 +873,7 @@ export default function HomeClient(props: Props) {
         </header>
 
         {orderedModules.map((m) => (
-          <div
-            key={m.id}
-            className={m.spanClass}
-            draggable={layoutEnabled}
-            onDragStart={handleDragStart(m.id)}
-            onDragOver={handleDragOver}
-            onDrop={handleDrop(m.id)}
-            style={{ position: "relative" }}
-          >
-            {layoutEnabled ? (
-              <span
-                className="atesto-badge"
-                style={{ position: "absolute", top: 10, right: 10, cursor: "grab", zIndex: 2 }}
-              >
-                drag
-              </span>
-            ) : null}
+          <div key={m.id} className={m.spanClass}>
             {m.content}
           </div>
         ))}

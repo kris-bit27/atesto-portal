@@ -31,12 +31,12 @@ export default async function Page() {
     }),
     prisma.category.findMany({
       where: { isActive: true },
-      orderBy: { order: "asc" },
-      select: { id: true, slug: true, title: true, order: true, isActive: true },
+      orderBy: [{ order: "asc" }, { title: "asc" }],
+      select: { id: true, slug: true, title: true, order: true, isActive: true, _count: { select: { questions: true } } },
     }),
     prisma.subcategory.findMany({
       where: { isActive: true },
-      orderBy: [{ categoryId: "asc" }, { order: "asc" }],
+      orderBy: [{ order: "asc" }, { title: "asc" }],
       select: { id: true, slug: true, title: true, order: true, categoryId: true, isActive: true },
     }),
   ]);
