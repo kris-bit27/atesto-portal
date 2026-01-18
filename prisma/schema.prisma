@@ -59,6 +59,42 @@ model Domain {
   @@index([isActive, order])
 }
 
+model Category {
+  id       String  @id @default(cuid())
+  title    String
+  slug     String  @unique
+  order    Int     @default(0)
+  isActive Boolean @default(true)
+
+  subcategories Subcategory[]
+  questions     Question[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([order])
+  @@index([isActive, order])
+}
+
+model Subcategory {
+  id       String  @id @default(cuid())
+  title    String
+  slug     String  @unique
+  order    Int     @default(0)
+  isActive Boolean @default(true)
+
+  categoryId String
+  category   Category @relation(fields: [categoryId], references: [id])
+
+  questions Question[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([categoryId, order])
+  @@index([isActive, order])
+}
+
 model Topic {
   id    String @id @default(cuid())
   title String
@@ -89,6 +125,11 @@ model Question {
   specialtyId String?
   specialty   Specialty? @relation(fields: [specialtyId], references: [id])
 
+  categoryId    String?
+  category      Category?    @relation(fields: [categoryId], references: [id])
+  subcategoryId String?
+  subcategory   Subcategory? @relation(fields: [subcategoryId], references: [id])
+
   title  String
   slug   String        @unique
   status ContentStatus @default(DRAFT)
@@ -107,6 +148,8 @@ model Question {
   @@index([topicId])
   @@index([topicId, title])
   @@index([specialtyId])
+  @@index([categoryId])
+  @@index([subcategoryId])
   @@index([kind])
   @@index([source])
   @@index([updatedAt, slug])

@@ -31,7 +31,7 @@ export default function TiptapEditor({ value, onChange, placeholder }: Props) {
     if (!editor) return;
     const current = editor.getHTML();
     const next = value || "";
-    if (current !== next) editor.commands.setContent(next, false);
+    if (current !== next) editor.commands.setContent(next);
   }, [editor, value]);
 
   if (!editor) {

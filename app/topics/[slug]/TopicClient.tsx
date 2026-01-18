@@ -112,7 +112,7 @@ export default function TopicClient({ topic, specialties = [], domains = [] }: P
                 <span className="atesto-badge">{domainById.get(topic.domainId)?.title}</span>
               ) : null}
               <Link className="atesto-btn atesto-btn-ghost" href="/">
-                ← Home
+                ← Dashboard
               </Link>
             </div>
           </div>

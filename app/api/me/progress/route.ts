@@ -26,7 +26,9 @@ async function getUserId() {
 
 export async function GET() {
   const userId = await getUserId();
-  if (!userId) return NextResponse.json({ ok: false }, { status: 401 });
+  if (!userId) {
+    return NextResponse.json({ ok: true, read: [], fav: [], lastOpened: null });
+  }
 
   const [readRows, favRows, lastOpened] = await Promise.all([
     prisma.userQuestionProgress.findMany({
@@ -55,7 +57,7 @@ export async function GET() {
 
 export async function POST(req: Request) {
   const userId = await getUserId();
-  if (!userId) return NextResponse.json({ ok: false }, { status: 401 });
+  if (!userId) return NextResponse.json({ ok: true });
 
   const body = await req.json().catch(() => ({}));
   const read = body?.read as TogglePayload | undefined;
@@ -63,6 +65,8 @@ export async function POST(req: Request) {
   const opened = body?.opened as OpenPayload | undefined;
   const lastOpened = body?.lastOpened as LastOpenedPayload | undefined;
   const sync = body?.sync as { readSlugs?: string[]; favSlugs?: string[] } | undefined;
+  const srs = body?.srs as Record<string, any> | undefined;
+  void srs;
 
   const ops: any[] = [];
 

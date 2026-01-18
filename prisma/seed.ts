@@ -25,6 +25,19 @@ type SeedTopic = {
   questions: SeedQuestion[];
 };
 
+type SeedCategory = {
+  title: string;
+  slug: string;
+  order: number;
+};
+
+type SeedSubcategory = {
+  title: string;
+  slug: string;
+  order: number;
+  categorySlug: string;
+};
+
 const topics: SeedTopic[] = [
   // ===== A) Obecná plastická chirurgie + vrozené vady =====
   {
@@ -292,6 +305,195 @@ const topics: SeedTopic[] = [
   },
 ];
 
+const categories: SeedCategory[] = [
+  { title: "Základy & perioperační péče", slug: "zaklady-perioperacni-pece", order: 1 },
+  { title: "Laloky & rekonstrukce", slug: "laloky-rekonstrukce", order: 2 },
+  { title: "Chirurgie ruky", slug: "chirurgie-ruky", order: 3 },
+  { title: "Kraniofaciál & vrozené vady", slug: "kraniofacial-vrozene-vady", order: 4 },
+  { title: "Nádory & kožní léze", slug: "nadory-kozni-leze", order: 5 },
+  { title: "Popáleniny & termická poranění", slug: "popaleniny-termicka-poraneni", order: 6 },
+  { title: "Rekonstrukce specifických oblastí", slug: "rekonstrukce-specificke-oblasti", order: 7 },
+  { title: "Estetika", slug: "estetika", order: 8 },
+];
+
+const subcategories: SeedSubcategory[] = [
+  { title: "Hojení ran, jizvy, krytí", slug: "hojeni-ran-jizvy-kryti", order: 10, categorySlug: "zaklady-perioperacni-pece" },
+  { title: "ATB profylaxe, tromboprofylaxe", slug: "atb-trombo-profy", order: 11, categorySlug: "zaklady-perioperacni-pece" },
+  { title: "Anestezie (lokální/svodná)", slug: "anestezie-lokalni-svodna", order: 12, categorySlug: "zaklady-perioperacni-pece" },
+  {
+    title: "Mikrochirurgie základy, instrumentárium, turniket",
+    slug: "mikrochirurgie-zaklady-instrumentarium-turniket",
+    order: 13,
+    categorySlug: "zaklady-perioperacni-pece",
+  },
+
+  {
+    title: "Rekonstrukční žebřík, angiosomy, perforátory, delay",
+    slug: "rekonstrukcni-zebrik-angiosomy-perforatory-delay",
+    order: 20,
+    categorySlug: "laloky-rekonstrukce",
+  },
+  { title: "Místní/regionální laloky", slug: "mistni-regionalni-laloky", order: 21, categorySlug: "laloky-rekonstrukce" },
+  { title: "Volné laloky + monitorace", slug: "volne-laloky-monitorace", order: 22, categorySlug: "laloky-rekonstrukce" },
+  {
+    title: "Kožní štěpy, dermální náhrady, expandéry, lipofilling",
+    slug: "kozni-stepy-dermalni-nahrady-expandery-lipofilling",
+    order: 23,
+    categorySlug: "laloky-rekonstrukce",
+  },
+
+  {
+    title: "Vyšetření ruky, rehabilitace, dlahování",
+    slug: "vysetreni-ruky-rehabilitace-dlahovani",
+    order: 30,
+    categorySlug: "chirurgie-ruky",
+  },
+  { title: "Šlachy flexory/extenzory", slug: "slachy-flexory-extenzory", order: 31, categorySlug: "chirurgie-ruky" },
+  { title: "Periferní nervy, úžiny", slug: "periferni-nervy-uziny", order: 32, categorySlug: "chirurgie-ruky" },
+  {
+    title: "Infekce ruky, Dupuytren, degenerativní onemocnění",
+    slug: "infekce-ruky-dupuytren-degenerativni",
+    order: 33,
+    categorySlug: "chirurgie-ruky",
+  },
+  {
+    title: "Replantace/revaskularizace, amputace, krytí defektů",
+    slug: "replantace-revaskularizace-amputace-kryti-defektu",
+    order: 34,
+    categorySlug: "chirurgie-ruky",
+  },
+
+  { title: "Rozštěpy (rtu/patra), VPI", slug: "rozstepy-rtu-patra-vpi", order: 40, categorySlug: "kraniofacial-vrozene-vady" },
+  { title: "Kraniosynostózy, syndromy", slug: "kraniosynostozy-syndromy", order: 41, categorySlug: "kraniofacial-vrozene-vady" },
+  {
+    title: "Vady ucha, prsu/hrudní stěny, genitálu",
+    slug: "vady-ucha-prsu-hrudni-steny-genitalu",
+    order: 42,
+    categorySlug: "kraniofacial-vrozene-vady",
+  },
+  { title: "Vrozené vady ruky (OMT 2014)", slug: "vrozene-vady-ruky-omt-2014", order: 43, categorySlug: "kraniofacial-vrozene-vady" },
+
+  { title: "Melanom, NMSC, prekancerózy", slug: "melanom-nmsc-prekancerozy", order: 50, categorySlug: "nadory-kozni-leze" },
+  { title: "Benigní nádory, malformace", slug: "benigni-nadory-malformace", order: 51, categorySlug: "nadory-kozni-leze" },
+
+  {
+    title: "Klasifikace, první pomoc, šok",
+    slug: "popaleniny-klasifikace-prvni-pomoc-sok",
+    order: 60,
+    categorySlug: "popaleniny-termicka-poraneni",
+  },
+  {
+    title: "Nekrektomie, štěpy, kryty, rekonstrukce, rehab",
+    slug: "nekrektomie-stepy-kryty-rekonstrukce-rehab",
+    order: 61,
+    categorySlug: "popaleniny-termicka-poraneni",
+  },
+  {
+    title: "Omrzliny, elektrická/chemická/radiační poranění",
+    slug: "omrzliny-elektricka-chemicka-radiacni",
+    order: 62,
+    categorySlug: "popaleniny-termicka-poraneni",
+  },
+
+  {
+    title: "Skalpa/čelo, víčka, nos, rty, tvář/mandibula/maxilla",
+    slug: "skalp-celo-vicka-nos-rty-tvar-mandibula-maxilla",
+    order: 70,
+    categorySlug: "rekonstrukce-specificke-oblasti",
+  },
+  { title: "Paréza n. facialis", slug: "pareza-n-facialis", order: 71, categorySlug: "rekonstrukce-specificke-oblasti" },
+  { title: "Dekubity, břišní stěna/perineum", slug: "dekubity-brisni-stena-perineum", order: 72, categorySlug: "rekonstrukce-specificke-oblasti" },
+  { title: "DK defekty (bérec/noha/diabetická noha)", slug: "dk-defekty-berec-noha-diabeticka-noha", order: 73, categorySlug: "rekonstrukce-specificke-oblasti" },
+
+  {
+    title: "Základy (laser, botulotoxin, výplně, liposukce, facelift, blefaroplastika, rhinoplastika)",
+    slug: "estetika-zaklady",
+    order: 80,
+    categorySlug: "estetika",
+  },
+];
+
+const normalize = (input: string) =>
+  input
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+
+const hasAny = (haystack: string, keywords: string[]) => keywords.some((k) => haystack.includes(k));
+
+const subcategoryRules = [
+  { slug: "hojeni-ran-jizvy-kryti", category: "zaklady-perioperacni-pece", keywords: ["hojeni", "jizv", "kryti", "rana"] },
+  { slug: "atb-trombo-profy", category: "zaklady-perioperacni-pece", keywords: ["trombo", "dvt", "pe", "atb", "profylax"] },
+  { slug: "anestezie-lokalni-svodna", category: "zaklady-perioperacni-pece", keywords: ["anestez", "svodn", "lokaln"] },
+  { slug: "mikrochirurgie-zaklady-instrumentarium-turniket", category: "zaklady-perioperacni-pece", keywords: ["mikrochir", "instrument", "turniket", "magnifik"] },
+
+  { slug: "rekonstrukcni-zebrik-angiosomy-perforatory-delay", category: "laloky-rekonstrukce", keywords: ["zebrik", "angiosom", "perfor", "delay"] },
+  { slug: "mistni-regionalni-laloky", category: "laloky-rekonstrukce", keywords: ["mistni", "regional", "vzdalen", "laloky"] },
+  { slug: "volne-laloky-monitorace", category: "laloky-rekonstrukce", keywords: ["volne", "free", "monitor", "nonreflow"] },
+  { slug: "kozni-stepy-dermalni-nahrady-expandery-lipofilling", category: "laloky-rekonstrukce", keywords: ["step", "transplant", "dermaln", "expanz", "lipofill"] },
+
+  { slug: "vysetreni-ruky-rehabilitace-dlahovani", category: "chirurgie-ruky", keywords: ["vysetren", "rehabilit", "dlah", "protetik", "fixac"] },
+  { slug: "slachy-flexory-extenzory", category: "chirurgie-ruky", keywords: ["slach", "flexor", "extenzor", "mallet", "boutonniere"] },
+  { slug: "periferni-nervy-uziny", category: "chirurgie-ruky", keywords: ["nerv", "uzin", "cts", "karp", "kubit", "guyon"] },
+  { slug: "infekce-ruky-dupuytren-degenerativni", category: "chirurgie-ruky", keywords: ["infekc", "dupuytren", "degenerativ"] },
+  { slug: "replantace-revaskularizace-amputace-kryti-defektu", category: "chirurgie-ruky", keywords: ["replant", "revask", "amputac", "isch", "kryti defekt"] },
+
+  { slug: "rozstepy-rtu-patra-vpi", category: "kraniofacial-vrozene-vady", keywords: ["rozstep", "vpi", "patra", "rtu"] },
+  { slug: "kraniosynostozy-syndromy", category: "kraniofacial-vrozene-vady", keywords: ["kraniosyn", "syndrom"] },
+  { slug: "vady-ucha-prsu-hrudni-steny-genitalu", category: "kraniofacial-vrozene-vady", keywords: ["bolt", "ucha", "prs", "hrudn", "genital", "hypospad", "epispad", "extrof"] },
+  { slug: "vrozene-vady-ruky-omt-2014", category: "kraniofacial-vrozene-vady", keywords: ["vrozene vady ruky", "omt"] },
+
+  { slug: "melanom-nmsc-prekancerozy", category: "nadory-kozni-leze", keywords: ["melanom", "nmsc", "prekancer", "malign"] },
+  { slug: "benigni-nadory-malformace", category: "nadory-kozni-leze", keywords: ["benign", "malformac", "nev", "tumor"] },
+
+  { slug: "popaleniny-klasifikace-prvni-pomoc-sok", category: "popaleniny-termicka-poraneni", keywords: ["popalen", "prvni pomoc", "sok", "eschar"] },
+  { slug: "nekrektomie-stepy-kryty-rekonstrukce-rehab", category: "popaleniny-termicka-poraneni", keywords: ["nekrektom", "autotrans", "kryt", "nahrad", "rehab"] },
+  { slug: "omrzliny-elektricka-chemicka-radiacni", category: "popaleniny-termicka-poraneni", keywords: ["omrzlin", "elektr", "chemick", "radiac", "inhalac"] },
+
+  {
+    slug: "skalp-celo-vicka-nos-rty-tvar-mandibula-maxilla",
+    category: "rekonstrukce-specificke-oblasti",
+    keywords: ["skalp", "celo", "vicka", "nos", "ret", "tvar", "maxill", "mandibul"],
+  },
+  { slug: "pareza-n-facialis", category: "rekonstrukce-specificke-oblasti", keywords: ["facialis", "pareza"] },
+  { slug: "dekubity-brisni-stena-perineum", category: "rekonstrukce-specificke-oblasti", keywords: ["dekubit", "brisni", "perine"] },
+  { slug: "dk-defekty-berec-noha-diabeticka-noha", category: "rekonstrukce-specificke-oblasti", keywords: ["berec", "noha", "hlezno", "diabet"] },
+
+  { slug: "estetika-zaklady", category: "estetika", keywords: ["estet", "laser", "botulotoxin", "vypln", "liposuk", "facelift", "blefaroplast", "rhinoplast"] },
+];
+
+const categoryRules = [
+  { slug: "chirurgie-ruky", keywords: ["ruka", "hand", "karp", "cts", "flexor", "extenzor", "dupuytren"] },
+  { slug: "popaleniny-termicka-poraneni", keywords: ["popalen", "termick", "omrzlin", "elektr", "chemick", "radiac"] },
+  { slug: "nadory-kozni-leze", keywords: ["melanom", "nmsc", "prekancer", "malign", "nador", "tumor"] },
+  { slug: "kraniofacial-vrozene-vady", keywords: ["rozstep", "kranio", "syndrom", "vrozene", "bolt", "genital"] },
+  { slug: "rekonstrukce-specificke-oblasti", keywords: ["skalp", "celo", "vicka", "nos", "ret", "tvar", "mandibul", "maxill", "dekubit", "berec", "noha"] },
+  { slug: "laloky-rekonstrukce", keywords: ["lalok", "step", "rekonstruk", "expanz", "lipofill", "angiosom", "perfor"] },
+  { slug: "zaklady-perioperacni-pece", keywords: ["hojeni", "trombo", "anestez", "mikrochir", "turniket", "lymfe"] },
+  { slug: "estetika", keywords: ["estet", "laser", "botulotoxin", "vypln", "liposuk", "facelift", "blefaroplast", "rhinoplast"] },
+];
+
+const topicSlugCategory = (topicSlug: string, haystack: string) => {
+  if (topicSlug.startsWith("a1")) return "zaklady-perioperacni-pece";
+  if (topicSlug.startsWith("a2") || topicSlug.startsWith("a3")) return "laloky-rekonstrukce";
+  if (topicSlug.startsWith("a6") || topicSlug.startsWith("a7")) return "kraniofacial-vrozene-vady";
+  if (topicSlug.startsWith("b8")) return "nadory-kozni-leze";
+  if (topicSlug.startsWith("b9")) return "popaleniny-termicka-poraneni";
+  if (topicSlug.startsWith("b1") || topicSlug.startsWith("b3") || topicSlug.startsWith("b5") || topicSlug.startsWith("b7")) {
+    return "rekonstrukce-specificke-oblasti";
+  }
+  if (topicSlug.startsWith("b6")) return "chirurgie-ruky";
+  if (topicSlug.startsWith("c")) {
+    if (haystack.includes("estet")) return "estetika";
+    return "chirurgie-ruky";
+  }
+  if (topicSlug.startsWith("b2")) {
+    if (haystack.includes("nador") || haystack.includes("malign")) return "nadory-kozni-leze";
+    return "laloky-rekonstrukce";
+  }
+  return "";
+};
+
 async function main() {
   console.log("🌱 Seeding topics + questions...");
 
@@ -329,6 +531,81 @@ async function main() {
     }
   }
 
+  console.log("🌱 Seeding categories + subcategories...");
+
+  for (const c of categories) {
+    await prisma.category.upsert({
+      where: { slug: c.slug },
+      update: { title: c.title, order: c.order, isActive: true },
+      create: { title: c.title, slug: c.slug, order: c.order, isActive: true },
+    });
+  }
+
+  const categoryBySlug = new Map(
+    (await prisma.category.findMany({ select: { id: true, slug: true } })).map((c) => [c.slug, c.id])
+  );
+
+  for (const s of subcategories) {
+    const categoryId = categoryBySlug.get(s.categorySlug);
+    if (!categoryId) continue;
+    await prisma.subcategory.upsert({
+      where: { slug: s.slug },
+      update: { title: s.title, order: s.order, isActive: true, categoryId },
+      create: { title: s.title, slug: s.slug, order: s.order, isActive: true, categoryId },
+    });
+  }
+
+  const subcategoryBySlug = new Map(
+    (await prisma.subcategory.findMany({ select: { id: true, slug: true, categoryId: true } })).map((s) => [
+      s.slug,
+      s,
+    ])
+  );
+
+  console.log("🧭 Assigning category/subcategory to questions...");
+  const allQuestions = await prisma.question.findMany({
+    select: {
+      id: true,
+      title: true,
+      slug: true,
+      categoryId: true,
+      subcategoryId: true,
+      topic: { select: { slug: true, title: true } },
+    },
+  });
+
+  let updatedCount = 0;
+  for (const q of allQuestions) {
+    const haystack = normalize(`${q.title} ${q.slug} ${q.topic?.title || ""} ${q.topic?.slug || ""}`);
+    const topicSlug = normalize(q.topic?.slug || "");
+
+    const subRule = subcategoryRules.find((r) => hasAny(haystack, r.keywords));
+    const subSlug = subRule?.slug || "";
+    let catSlug = subRule?.category || "";
+
+    if (!catSlug) {
+      const catRule = categoryRules.find((r) => hasAny(haystack, r.keywords));
+      catSlug = catRule?.slug || "";
+    }
+    if (!catSlug) catSlug = topicSlugCategory(topicSlug, haystack);
+
+    let categoryId = catSlug ? categoryBySlug.get(catSlug) : undefined;
+    const subcategory = subSlug ? subcategoryBySlug.get(subSlug) : undefined;
+    const subcategoryId = subcategory?.id;
+    if (!categoryId && subcategory?.categoryId) categoryId = subcategory.categoryId;
+
+    if (!categoryId && !subcategoryId) continue;
+
+    const data: { categoryId?: string; subcategoryId?: string } = {};
+    if (categoryId && q.categoryId !== categoryId) data.categoryId = categoryId;
+    if (subcategoryId && q.subcategoryId !== subcategoryId) data.subcategoryId = subcategoryId;
+    if (!Object.keys(data).length) continue;
+
+    await prisma.question.update({ where: { id: q.id }, data });
+    updatedCount += 1;
+  }
+
+  console.log(`✅ Categories assigned: ${updatedCount}`);
   console.log("✅ Seed complete.");
 }
 

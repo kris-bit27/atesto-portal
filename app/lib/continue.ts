@@ -12,6 +12,23 @@ export function loadReadSet(key = "atesto:read"): Set<string> {
   }
 }
 
+export function loadReadList(key = "atesto:read"): string[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return [];
+    const arr = JSON.parse(raw);
+    return Array.isArray(arr) ? arr.filter((x) => typeof x === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
+export function pickMostRecentRead(readList: string[]): string | null {
+  if (!readList.length) return null;
+  return readList[readList.length - 1] || null;
+}
+
 export function pickNextUnread(
   topics: Array<{ questions?: Array<{ slug: string }> }>,
   readSet: Set<string>

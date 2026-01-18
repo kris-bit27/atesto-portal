@@ -14,22 +14,29 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Missing topicSlug/title/slug" }, { status: 400 });
   }
 
-  const topic = await prisma.topic.findUnique({
-    where: { slug: topicSlug },
-    select: { id: true, slug: true },
-  });
-  if (!topic) return NextResponse.json({ error: "Topic not found" }, { status: 404 });
+  try {
+    const exists = await prisma.question.findFirst({ where: { slug }, select: { id: true } });
+    if (exists) return NextResponse.json({ error: "slug již existuje" }, { status: 409 });
 
-  const question = await prisma.question.create({
-    data: {
-      topicId: topic.id,
-      title,
-      slug,
-      status: "DRAFT",
-      contentHtml: "",
-    },
-    select: { slug: true, title: true, status: true, topicId: true },
-  });
+    const topic = await prisma.topic.findUnique({
+      where: { slug: topicSlug },
+      select: { id: true, slug: true },
+    });
+    if (!topic) return NextResponse.json({ error: "Topic not found" }, { status: 404 });
 
-  return NextResponse.json({ ok: true, question });
+    const question = await prisma.question.create({
+      data: {
+        topicId: topic.id,
+        title,
+        slug,
+        status: "DRAFT",
+        contentHtml: "",
+      },
+      select: { slug: true, title: true, status: true, topicId: true },
+    });
+
+    return NextResponse.json({ ok: true, question });
+  } catch {
+    return NextResponse.json({ error: "Failed to create question" }, { status: 400 });
+  }
 }

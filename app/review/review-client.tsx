@@ -120,13 +120,31 @@ export default function ReviewClient() {
                     Otevřít
                   </Link>
                   <button
-                    className="atesto-btn atesto-btn-primary"
+                    className="atesto-btn"
                     onClick={() => {
-                      markReviewed(slug);
+                      markReviewed(slug, "hard");
                       setDue(listDue());
                     }}
                   >
-                    Hotovo
+                    HARD
+                  </button>
+                  <button
+                    className="atesto-btn atesto-btn-primary"
+                    onClick={() => {
+                      markReviewed(slug, "ok");
+                      setDue(listDue());
+                    }}
+                  >
+                    OK
+                  </button>
+                  <button
+                    className="atesto-btn"
+                    onClick={() => {
+                      markReviewed(slug, "easy");
+                      setDue(listDue());
+                    }}
+                  >
+                    EASY
                   </button>
                   <button
                     className="atesto-btn atesto-btn-danger"
@@ -143,9 +161,7 @@ export default function ReviewClient() {
           })}
         </div>
 
-        <div className="atesto-subtle">
-          Pozn.: Interval/due info je v localStorage. V další verzi doplníme i “hard/ok/easy”.
-        </div>
+        <div className="atesto-subtle">Pozn.: Interval/due info je v localStorage.</div>
       </div>
     </div>
   );

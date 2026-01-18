@@ -8,6 +8,7 @@ const READ_KEYS = ["atesto:read", "atesto_read_slugs"];
 const FAV_KEYS = [FAV_KEY, "atesto:favs"];
 const LAST_OPENED_KEY = "atesto:lastOpened";
 const AUTH_MARKER_KEY = "atesto:authProgress";
+const SRS_KEY = "atesto_srs_v1";
 
 type LastOpened = { slug: string; at: number };
 
@@ -58,6 +59,19 @@ function saveLastOpened(next: LastOpened | null) {
     window.localStorage.setItem(LAST_OPENED_KEY, JSON.stringify(next));
   } catch {
     // ignore
+  }
+}
+
+function loadSrsRaw(): Record<string, any> | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.localStorage.getItem(SRS_KEY);
+    if (!raw) return null;
+    const obj = JSON.parse(raw);
+    if (!obj || typeof obj !== "object") return null;
+    return obj as Record<string, any>;
+  } catch {
+    return null;
   }
 }
 
@@ -121,6 +135,7 @@ export default function ProgressSync() {
               readSlugs: Array.from(mergedRead),
               favSlugs: Array.from(mergedFav),
             },
+            srs: loadSrsRaw(),
           }),
         });
       } finally {

@@ -10,7 +10,7 @@ export default function EditorIndex() {
       </p>
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
         <Link href="/" style={{ padding: "8px 12px", borderRadius: 12, border: "1px solid rgba(255,255,255,.2)" }}>
-          ← Zpět na Home
+          ← Zpět na Dashboard
         </Link>
         <Link href="/admin" style={{ padding: "8px 12px", borderRadius: 12, border: "1px solid rgba(255,255,255,.2)" }}>
           Otevřít Admin →

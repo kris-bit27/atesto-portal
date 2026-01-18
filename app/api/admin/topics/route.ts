@@ -11,12 +11,16 @@ export async function GET(req: NextRequest) {
   const auth = assertAdminKey(req);
   if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: 401 });
 
-  const topics = await prisma.topic.findMany({
-    orderBy: { order: "asc" },
-    include: { _count: { select: { questions: true } } },
-  });
+  try {
+    const topics = await prisma.topic.findMany({
+      orderBy: { order: "asc" },
+      include: { _count: { select: { questions: true } } },
+    });
 
-  return NextResponse.json({ topics });
+    return NextResponse.json({ topics });
+  } catch {
+    return NextResponse.json({ error: "Failed to load topics" }, { status: 400 });
+  }
 }
 
 export async function POST(req: NextRequest) {
@@ -31,9 +35,16 @@ export async function POST(req: NextRequest) {
   if (!title) return NextResponse.json({ error: "title je povinný" }, { status: 400 });
   if (!slug) return NextResponse.json({ error: "slug je povinný" }, { status: 400 });
 
-  const created = await prisma.topic.create({
-    data: { title, slug, order },
-  });
+  try {
+    const exists = await prisma.topic.findFirst({ where: { slug }, select: { id: true } });
+    if (exists) return NextResponse.json({ error: "slug již existuje" }, { status: 409 });
 
-  return NextResponse.json({ ok: true, created });
+    const created = await prisma.topic.create({
+      data: { title, slug, order },
+    });
+
+    return NextResponse.json({ ok: true, created });
+  } catch {
+    return NextResponse.json({ error: "Failed to create topic" }, { status: 400 });
+  }
 }

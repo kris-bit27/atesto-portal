@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { usePathname } from "next/navigation";
+import { buildPrompt, type CopilotKind } from "@/app/lib/copilotTemplates";
 
 type Msg = { role: "user" | "assistant"; text: string };
 
@@ -71,8 +72,12 @@ async function fetchQuestionContext(slug: string): Promise<QuestionCtx | null> {
   }
 }
 
-export default function Copilot() {
-  const [open, setOpen] = useState(false);
+type CopilotProps = {
+  defaultOpen?: boolean;
+};
+
+export default function Copilot({ defaultOpen = false }: CopilotProps) {
+  const [open, setOpen] = useState(defaultOpen);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
   const [targetKind, setTargetKind] = useState<CopilotKind>("ANSWER");

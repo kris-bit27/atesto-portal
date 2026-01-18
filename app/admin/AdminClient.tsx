@@ -13,8 +13,12 @@ type Question = {
   status: string;
   contentHtml: string;
   updatedAt: string;
+  categoryId?: string | null;
+  subcategoryId?: string | null;
   topic?: { id: string; title: string; slug: string; order: number };
 };
+type Category = { id: string; title: string; slug: string; order: number; subcategories?: Subcategory[] };
+type Subcategory = { id: string; title: string; slug: string; order: number; categoryId: string };
 
 export default function AdminClient() {
   const [key, setKey] = useState("");
@@ -35,6 +39,7 @@ export default function AdminClient() {
 
   const [topics, setTopics] = useState<Topic[]>([]);
   const [questions, setQuestions] = useState<Question[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkStatus, setBulkStatus] = useState<string>("");
   const [previewOpen, setPreviewOpen] = useState<Set<string>>(new Set());
@@ -45,6 +50,8 @@ export default function AdminClient() {
   const [newQ, setNewQ] = useState({ topicId: "", title: "", slug: "", status: "DRAFT" });
   const [filterTopicId, setFilterTopicId] = useState<string>("");
   const [filterStatus, setFilterStatus] = useState<"" | "DRAFT" | "PUBLISHED">("");
+  const [filterCategoryId, setFilterCategoryId] = useState<string>("");
+  const [filterSubcategoryId, setFilterSubcategoryId] = useState<string>("");
 
   // selected question (single editor)
   const [selectedId, setSelectedId] = useState<string>("");
@@ -57,6 +64,8 @@ export default function AdminClient() {
     slug: string;
     status: string;
     contentHtml: string;
+    categoryId?: string | null;
+    subcategoryId?: string | null;
   } | null>(null);
   const [saving, setSaving] = useState(false);
   const [saveErr, setSaveErr] = useState("");
@@ -74,6 +83,8 @@ export default function AdminClient() {
       slug: selected.slug,
       status: selected.status,
       contentHtml: selected.contentHtml || "",
+      categoryId: selected.categoryId,
+      subcategoryId: selected.subcategoryId,
     });
     setSaveErr("");
     setLastSavedAt(null);
@@ -94,10 +105,14 @@ export default function AdminClient() {
     setLoading(true);
     setErr("");
     try {
-      const t = await api<{ topics: Topic[] }>("/api/admin/topics");
+      const [t, q, c] = await Promise.all([
+        api<{ topics: Topic[] }>("/api/admin/topics"),
+        api<{ questions: Question[] }>("/api/admin/questions"),
+        api<{ categories: Category[] }>("/api/admin/categories"),
+      ]);
       setTopics(t.topics || []);
-      const q = await api<{ questions: Question[] }>("/api/admin/questions");
       setQuestions(q.questions || []);
+      setCategories(c.categories || []);
     } catch (e: any) {
       setErr(e?.message || "Chyba");
     } finally {
@@ -112,13 +127,32 @@ export default function AdminClient() {
   }, [key]);
 
   const topicsById = useMemo(() => new Map(topics.map((t) => [t.id, t])), [topics]);
+  const categoryById = useMemo(() => new Map(categories.map((c) => [c.id, c])), [categories]);
+  const subcategoryById = useMemo(() => {
+    const list = categories.flatMap((c) => c.subcategories || []);
+    return new Map(list.map((s) => [s.id, s]));
+  }, [categories]);
+
+  const filteredSubcategories = useMemo(() => {
+    const list = categories.flatMap((c) => c.subcategories || []);
+    if (!filterCategoryId) return list;
+    return list.filter((s) => s.categoryId === filterCategoryId);
+  }, [categories, filterCategoryId]);
+
+  const editorSubcategories = useMemo(() => {
+    const list = categories.flatMap((c) => c.subcategories || []);
+    if (!draft?.categoryId) return list;
+    return list.filter((s) => s.categoryId === draft.categoryId);
+  }, [categories, draft?.categoryId]);
 
   const filteredQuestions = useMemo(() => {
     let list = questions;
     if (filterTopicId) list = list.filter((q) => q.topicId === filterTopicId);
     if (filterStatus) list = list.filter((q) => q.status === filterStatus);
+    if (filterCategoryId) list = list.filter((q) => q.categoryId === filterCategoryId);
+    if (filterSubcategoryId) list = list.filter((q) => q.subcategoryId === filterSubcategoryId);
     return list;
-  }, [questions, filterTopicId, filterStatus]);
+  }, [questions, filterTopicId, filterStatus, filterCategoryId, filterSubcategoryId]);
 
   const isDirty = useMemo(() => {
     if (!draft || !selected) return false;
@@ -127,6 +161,8 @@ export default function AdminClient() {
       draft.slug !== selected.slug ||
       draft.status !== selected.status ||
       draft.topicId !== selected.topicId ||
+      draft.categoryId !== selected.categoryId ||
+      draft.subcategoryId !== selected.subcategoryId ||
       (draft.contentHtml || "") !== (selected.contentHtml || "")
     );
   }, [draft, selected]);
@@ -305,6 +341,34 @@ export default function AdminClient() {
               <option value="DRAFT">DRAFT</option>
               <option value="PUBLISHED">PUBLISHED</option>
             </select>
+            <select
+              className="atesto-input"
+              value={filterCategoryId}
+              onChange={(e) => {
+                setFilterCategoryId(e.target.value);
+                setFilterSubcategoryId("");
+              }}
+            >
+              <option value="">Kategorie: všechny</option>
+              {categories.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.title}
+                </option>
+              ))}
+            </select>
+            <select
+              className="atesto-input"
+              value={filterSubcategoryId}
+              onChange={(e) => setFilterSubcategoryId(e.target.value)}
+              disabled={!filteredSubcategories.length}
+            >
+              <option value="">Subkategorie: všechny</option>
+              {filteredSubcategories.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.title}
+                </option>
+              ))}
+            </select>
 
             <input
               className="atesto-input"
@@ -375,6 +439,14 @@ export default function AdminClient() {
                     <div className="atesto-subtle">
                       {topicsById.get(draft.topicId)?.title || ""} • id: {draft.id}
                     </div>
+                    {draft.categoryId && categoryById.get(draft.categoryId) ? (
+                      <div className="atesto-subtle">
+                        {categoryById.get(draft.categoryId)?.title}
+                        {draft.subcategoryId && subcategoryById.get(draft.subcategoryId)
+                          ? ` / ${subcategoryById.get(draft.subcategoryId)?.title}`
+                          : ""}
+                      </div>
+                    ) : null}
                   </div>
                   <div className="atesto-row">
                     <button
@@ -457,6 +529,39 @@ export default function AdminClient() {
                     <option value="DRAFT">DRAFT</option>
                     <option value="PUBLISHED">PUBLISHED</option>
                   </select>
+
+                  <select
+                    className="atesto-input"
+                    value={draft.categoryId || ""}
+                    onChange={(e) =>
+                      setDraft((s) =>
+                        s ? { ...s, categoryId: e.target.value || null, subcategoryId: null } : s
+                      )
+                    }
+                  >
+                    <option value="">Kategorie: žádná</option>
+                    {categories.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.title}
+                      </option>
+                    ))}
+                  </select>
+
+                  <select
+                    className="atesto-input"
+                    value={draft.subcategoryId || ""}
+                    onChange={(e) =>
+                      setDraft((s) => (s ? { ...s, subcategoryId: e.target.value || null } : s))
+                    }
+                    disabled={!editorSubcategories.length}
+                  >
+                    <option value="">Subkategorie: žádná</option>
+                    {editorSubcategories.map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.title}
+                      </option>
+                    ))}
+                  </select>
                 </div>
 
                 <div className="atesto-row" style={{ gap: 12, flexWrap: "wrap" }}>
@@ -517,6 +622,12 @@ export default function AdminClient() {
                         </div>
                         <div className="atesto-subtle">
                           {topicsById.get(q.topicId)?.title || q.topic?.title || "—"} • slug: {q.slug}
+                          {q.categoryId && categoryById.get(q.categoryId)
+                            ? ` • ${categoryById.get(q.categoryId)?.title}`
+                            : ""}
+                          {q.subcategoryId && subcategoryById.get(q.subcategoryId)
+                            ? ` / ${subcategoryById.get(q.subcategoryId)?.title}`
+                            : ""}
                         </div>
                       </div>
 

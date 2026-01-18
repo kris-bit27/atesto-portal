@@ -20,12 +20,34 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   if (typeof body.slug === "string") data.slug = body.slug.trim();
   if (typeof body.order === "number") data.order = body.order;
 
-  const updated = await prisma.topic.update({
-    where: { id: params.id },
-    data,
-  });
+  if ("title" in data && !data.title) {
+    return NextResponse.json({ error: "title je povinný" }, { status: 400 });
+  }
+  if ("slug" in data && !data.slug) {
+    return NextResponse.json({ error: "slug je povinný" }, { status: 400 });
+  }
+  if (!Object.keys(data).length) {
+    return NextResponse.json({ error: "No fields to update" }, { status: 400 });
+  }
 
-  return NextResponse.json({ ok: true, updated });
+  try {
+    if (data.slug) {
+      const exists = await prisma.topic.findFirst({
+        where: { slug: data.slug, NOT: { id: params.id } },
+        select: { id: true },
+      });
+      if (exists) return NextResponse.json({ error: "slug již existuje" }, { status: 409 });
+    }
+
+    const updated = await prisma.topic.update({
+      where: { id: params.id },
+      data,
+    });
+
+    return NextResponse.json({ ok: true, updated });
+  } catch {
+    return NextResponse.json({ error: "Failed to update topic" }, { status: 400 });
+  }
 }
 
 export async function DELETE(req: NextRequest, { params }: Params) {
@@ -34,7 +56,10 @@ export async function DELETE(req: NextRequest, { params }: Params) {
 
   // Pozor: pokud má topic otázky, Prisma může spadnout na FK.
   // Necháme to explicitně (ať je jasné, že nejdřív smaž otázky).
-  await prisma.topic.delete({ where: { id: params.id } });
-
-  return NextResponse.json({ ok: true });
+  try {
+    await prisma.topic.delete({ where: { id: params.id } });
+    return NextResponse.json({ ok: true });
+  } catch {
+    return NextResponse.json({ error: "Failed to delete topic" }, { status: 400 });
+  }
 }

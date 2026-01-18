@@ -13,7 +13,7 @@ export default function ReviewPage() {
               <div className="atesto-subtle">SRS light • otázky “k opakování”</div>
             </div>
             <div className="atesto-row">
-              <Link className="atesto-btn" href="/">Home</Link>
+              <Link className="atesto-btn" href="/">Dashboard</Link>
               <Link className="atesto-btn" href="/read">Read</Link>
               <Link className="atesto-btn" href="/search">Search</Link>
             </div>

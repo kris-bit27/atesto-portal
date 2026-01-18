@@ -21,12 +21,15 @@ export default function EditorClient({
   initialStatus,
   initialHtml,
 }: Props) {
+  const adminKey = process.env.NEXT_PUBLIC_ADMIN_KEY || "";
   const [title, setTitle] = useState(initialTitle);
   const [status, setStatus] = useState<Status>(initialStatus || "DRAFT");
   const [contentHtml, setContentHtml] = useState(initialHtml || "");
 
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [saveError, setSaveError] = useState<string | undefined>(undefined);
+  const [publishState, setPublishState] = useState<"" | "saving" | "saved" | "error">("");
+  const [publishError, setPublishError] = useState<string | undefined>(undefined);
 
   const timerRef = useRef<number | null>(null);
   const hydratedRef = useRef(false);
@@ -51,17 +54,14 @@ export default function EditorClient({
     () =>
       JSON.stringify({
         title,
-        status,
         contentHtml,
       }),
-    [title, status, contentHtml]
+    [title, contentHtml]
   );
 
-  async function doSave(next?: { status?: Status }) {
+  async function doSave() {
     setSaveState("saving");
     setSaveError(undefined);
-
-    const nextStatus = next?.status ?? status;
 
     try {
       const res = await fetch(`/api/questions/${encodeURIComponent(slug)}`, {
@@ -69,7 +69,6 @@ export default function EditorClient({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           title,
-          status: nextStatus,
           contentHtml,
         }),
       });
@@ -77,12 +76,34 @@ export default function EditorClient({
       const data = await res.json().catch(() => ({}));
       if (!res.ok || !data?.ok) throw new Error(data?.error || `Save failed (${res.status})`);
 
-      setStatus(nextStatus);
       lastSavedRef.current = snapshot;
       setSaveState("saved");
     } catch (e: any) {
       setSaveState("error");
       setSaveError(String(e?.message ?? e));
+    }
+  }
+
+  async function updateStatus(nextStatus: Status) {
+    if (!adminKey) return;
+    setPublishState("saving");
+    setPublishError(undefined);
+    try {
+      const qs = adminKey ? `?key=${encodeURIComponent(adminKey)}` : "";
+      const res = await fetch(`/api/admin/question/${encodeURIComponent(slug)}${qs}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: nextStatus }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data?.ok) throw new Error(data?.error || `Update failed (${res.status})`);
+      setStatus(nextStatus);
+      setPublishState("saved");
+      setTimeout(() => setPublishState(""), 1200);
+    } catch (e: any) {
+      setPublishState("error");
+      setPublishError(String(e?.message ?? e));
+      setTimeout(() => setPublishState(""), 2000);
     }
   }
 
@@ -122,6 +143,11 @@ export default function EditorClient({
           </span>
 
           <SaveStatusBadge state={saveState} errorText={saveError} />
+          {publishState === "saving" ? <span className="opacity-80 text-sm">Updating…</span> : null}
+          {publishState === "saved" ? <span className="opacity-80 text-sm">Updated</span> : null}
+          {publishState === "error" ? (
+            <span className="text-sm text-red-300">Update failed{publishError ? ` (${publishError})` : ""}</span>
+          ) : null}
         </div>
 
         <div className="flex items-center gap-2">
@@ -132,20 +158,26 @@ export default function EditorClient({
           >
             Uložit
           </button>
-          <button
-            type="button"
-            className="rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm"
-            onClick={() => doSave({ status: "DRAFT" })}
-          >
-            Nastavit DRAFT
-          </button>
-          <button
-            type="button"
-            className="rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm"
-            onClick={() => doSave({ status: "PUBLISHED" })}
-          >
-            Publish
-          </button>
+          {adminKey ? (
+            <>
+              <button
+                type="button"
+                className="rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm"
+                disabled={publishState === "saving"}
+                onClick={() => updateStatus("DRAFT")}
+              >
+                Unpublish
+              </button>
+              <button
+                type="button"
+                className="rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm"
+                disabled={publishState === "saving"}
+                onClick={() => updateStatus("PUBLISHED")}
+              >
+                Publish
+              </button>
+            </>
+          ) : null}
         </div>
       </div>
 

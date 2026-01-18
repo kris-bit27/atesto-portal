@@ -18,30 +18,36 @@ function okKey(req: Request) {
 export async function GET(req: Request) {
   if (!okKey(req)) return unauthorized();
 
-  const questions = await prisma.question.findMany({
-    orderBy: [{ updatedAt: "desc" }, { createdAt: "desc" }],
-    select: {
-      id: true,
-      topicId: true,
-      title: true,
-      slug: true,
-      status: true,
-      contentHtml: true,
-      updatedAt: true,
-      topic: { select: { id: true, title: true, slug: true, order: true } },
-    },
-  });
+  try {
+    const questions = await prisma.question.findMany({
+      orderBy: [{ updatedAt: "desc" }, { createdAt: "desc" }],
+      select: {
+        id: true,
+        topicId: true,
+        title: true,
+        slug: true,
+        status: true,
+        contentHtml: true,
+        updatedAt: true,
+        categoryId: true,
+        subcategoryId: true,
+        topic: { select: { id: true, title: true, slug: true, order: true } },
+      },
+    });
 
-  return NextResponse.json({ questions });
+    return NextResponse.json({ questions });
+  } catch {
+    return NextResponse.json({ error: "Failed to load questions" }, { status: 400 });
+  }
 }
 
 export async function POST(req: Request) {
   if (!okKey(req)) return unauthorized();
 
   const body = await req.json().catch(() => ({}));
-  const topicId = typeof body.topicId === "string" ? body.topicId : "";
-  const title = typeof body.title === "string" ? body.title : "";
-  const slug = typeof body.slug === "string" ? body.slug : "";
+  const topicId = typeof body.topicId === "string" ? body.topicId.trim() : "";
+  const title = typeof body.title === "string" ? body.title.trim() : "";
+  const slug = typeof body.slug === "string" ? body.slug.trim() : "";
   const status = typeof body.status === "string" ? body.status : "DRAFT";
   const contentHtml = typeof body.contentHtml === "string" ? body.contentHtml : "";
 
@@ -49,10 +55,17 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Missing: topicId/title/slug" }, { status: 400 });
   }
 
-  const created = await prisma.question.create({
-    data: { topicId, title, slug, status: status as any, contentHtml },
-    select: { id: true, topicId: true, title: true, slug: true, status: true, updatedAt: true },
-  });
+  try {
+    const exists = await prisma.question.findFirst({ where: { slug }, select: { id: true } });
+    if (exists) return NextResponse.json({ error: "slug již existuje" }, { status: 409 });
 
-  return NextResponse.json({ ok: true, created });
+    const created = await prisma.question.create({
+      data: { topicId, title, slug, status: status as any, contentHtml },
+      select: { id: true, topicId: true, title: true, slug: true, status: true, updatedAt: true },
+    });
+
+    return NextResponse.json({ ok: true, created });
+  } catch {
+    return NextResponse.json({ error: "Failed to create question" }, { status: 400 });
+  }
 }

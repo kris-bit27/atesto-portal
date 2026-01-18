@@ -1,10 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
-import { loadReadSet, pickNextUnread } from "@/app/lib/continue";
-
-import { useTaxonomyFilters } from "@/app/lib/useTaxonomyFilters";
+import { useEffect, useMemo, useRef, useState, type DragEvent } from "react";
+import { loadReadList, loadReadSet, pickMostRecentRead, pickNextUnread } from "@/app/lib/continue";
+import { listDue } from "@/app/lib/srs";
 type Topic = {
   id: string;
   title: string;
@@ -12,80 +11,77 @@ type Topic = {
   order: number;
   specialtyId?: string | null;
   domainId?: string | null;
-  questions: { slug: string; title: string; status: "DRAFT" | "PUBLISHED"; kind?: string; source?: string; specialtyId?: string | null }[];
+  questions: {
+    slug: string;
+    title: string;
+    status: "DRAFT" | "PUBLISHED";
+    kind?: string;
+    source?: string;
+    specialtyId?: string | null;
+    categoryId?: string | null;
+    subcategoryId?: string | null;
+  }[];
 };
 
-type Tax = { id: string; slug: string; title: string; order?: number };
+type Tax = { id: string; slug: string; title: string; order?: number; isActive?: boolean };
 
 type Props = {
   topics: Topic[];
   specialties?: Tax[];
   domains?: Tax[];
+  categories?: Tax[];
+  subcategories?: (Tax & { categoryId: string })[];
 };
 
-function getSet(key: string) {
-  if (typeof window === "undefined") return new Set<string>();
-  try {
-    const raw = localStorage.getItem(key);
-    if (!raw) return new Set<string>();
-    const arr = JSON.parse(raw);
-    return new Set<string>(Array.isArray(arr) ? arr : []);
-  } catch {
-    return new Set<string>();
-  }
-}
-
+type DashboardModule = {
+  id: string;
+  spanClass?: string;
+  content: JSX.Element;
+};
 
 export default function HomeClient(props: Props) {
-  const { topics, specialties = [], domains = [] } = props;
-  const {
-    query,
-    setQuery,
-    q,
-    onlyPublished,
-    setOnlyPublished,
-    onlyFav,
-    setOnlyFav,
-    hideEmpty,
-    setHideEmpty,
-    specialtyId,
-    setSpecialtyId,
-    domainId,
-    setDomainId,
-    resetFilters,
-  } = useTaxonomyFilters({ defaultHideEmpty: true });
-
-  // MVP2: když změníš specialty, resetni doménu (aby nevznikl prázdný filtr)
-  useEffect(() => {
-    if (specialtyId) setDomainId("");
-  }, [specialtyId, setDomainId]);
-
-  // lookup maps (MVP2 badges)
-  const specialtyById = useMemo(() => {
-    const m = new Map<string, any>();
-    for (const it of specialties || []) m.set(it.id, it);
-    return m;
-  }, [specialties]);
-
-  const domainById = useMemo(() => {
-    const m = new Map<string, any>();
-    for (const it of domains || []) m.set(it.id, it);
-    return m;
-  }, [domains]);
-
-  const [favSet, setFavSet] = useState<Set<string>>(new Set());
+  const { topics, categories = [], subcategories = [] } = props;
   const [readSet, setReadSet] = useState<Set<string>>(new Set());
   const [lastOpenedSlug, setLastOpenedSlug] = useState<string | null>(null);
+  const [lastReadSlug, setLastReadSlug] = useState<string | null>(null);
+  const [dueCount, setDueCount] = useState(0);
+  const [recentOpened, setRecentOpened] = useState<string[]>([]);
+  const [analyticsDueToday, setAnalyticsDueToday] = useState(0);
+  const [analyticsStreak, setAnalyticsStreak] = useState(0);
+  const [analyticsThisWeek, setAnalyticsThisWeek] = useState(0);
+  const [dueNowItems, setDueNowItems] = useState<{ slug: string; dueAt: number }[]>([]);
+  const [sparkCounts, setSparkCounts] = useState<number[]>([]);
+  const [readsByDay, setReadsByDay] = useState<{ date: string; count: number }[]>([]);
+  const [layoutEnabled, setLayoutEnabled] = useState(false);
+  const [layoutOrder, setLayoutOrder] = useState<string[]>([]);
+  const prevReadCountRef = useRef(0);
+  const dragIdRef = useRef<string | null>(null);
 
   useEffect(() => {
-    setFavSet(getSet("atesto:favs"));
+    if (typeof window === "undefined") return;
+    try {
+      const raw = window.localStorage.getItem("mn:dashboardLayout:v1");
+      const arr = raw ? JSON.parse(raw) : [];
+      if (Array.isArray(arr)) setLayoutOrder(arr.filter((x) => typeof x === "string"));
+    } catch {}
+  }, []);
+
+  useEffect(() => {
     setReadSet(loadReadSet());
+    prevReadCountRef.current = loadReadSet().size;
+    setLastReadSlug(pickMostRecentRead(loadReadList()));
     const onStorage = () => {
-      setFavSet(getSet("atesto:favs"));
-      setReadSet(loadReadSet());
+      const next = loadReadSet();
+      setReadSet(next);
+      setLastReadSlug(pickMostRecentRead(loadReadList()));
     };
+    const onRead = () => setLastReadSlug(pickMostRecentRead(loadReadList()));
     window.addEventListener("storage", onStorage);
-    return () => window.removeEventListener("storage", onStorage);
+    window.addEventListener("atesto-read-updated", onRead as EventListener);
+    return () => {
+      window.removeEventListener("storage", onStorage);
+      window.removeEventListener("atesto-read-updated", onRead as EventListener);
+    };
   }, []);
 
   useEffect(() => {
@@ -113,7 +109,231 @@ export default function HomeClient(props: Props) {
     };
   }, []);
 
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const key = "atesto:readsByDay";
+    const toDateKey = (d: Date) => {
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, "0");
+      const day = String(d.getDate()).padStart(2, "0");
+      return `${y}-${m}-${day}`;
+    };
+    const readMap = () => {
+      try {
+        const raw = window.localStorage.getItem(key);
+        const obj = raw ? JSON.parse(raw) : {};
+        return typeof obj === "object" && obj ? obj : {};
+      } catch {
+        return {};
+      }
+    };
+    const getLast7 = () => {
+      const now = new Date();
+      const obj = readMap();
+      const out: { date: string; count: number }[] = [];
+      for (let i = 6; i >= 0; i--) {
+        const d = new Date(now);
+        d.setHours(0, 0, 0, 0);
+        d.setDate(d.getDate() - i);
+        const keyDay = toDateKey(d);
+        const count = typeof obj[keyDay] === "number" ? obj[keyDay] : 0;
+        out.push({ date: keyDay, count });
+      }
+      setReadsByDay(out);
+    };
+    const onOpened = () => {
+      const obj = readMap();
+      const today = toDateKey(new Date());
+      obj[today] = (typeof obj[today] === "number" ? obj[today] : 0) + 1;
+      try {
+        window.localStorage.setItem(key, JSON.stringify(obj));
+      } catch {}
+      getLast7();
+    };
+    getLast7();
+    window.addEventListener("atesto-opened", onOpened as EventListener);
+    window.addEventListener("storage", getLast7 as EventListener);
+    return () => {
+      window.removeEventListener("atesto-opened", onOpened as EventListener);
+      window.removeEventListener("storage", getLast7 as EventListener);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const readRecent = () => {
+      try {
+        const raw = window.localStorage.getItem("atesto:lastOpened");
+        if (!raw) {
+          setRecentOpened([]);
+          return;
+        }
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) {
+          const slugs = parsed
+            .map((it) => (typeof it === "string" ? it : typeof it?.slug === "string" ? it.slug : ""))
+            .filter(Boolean);
+          setRecentOpened(slugs.slice(-5).reverse());
+          return;
+        }
+        if (typeof parsed === "string") {
+          setRecentOpened([parsed]);
+          return;
+        }
+        if (typeof parsed?.slug === "string") {
+          setRecentOpened([parsed.slug]);
+          return;
+        }
+        setRecentOpened([]);
+      } catch {
+        setRecentOpened([]);
+      }
+    };
+    const readDue = () => setDueCount(listDue().length);
+    const readAnalytics = () => {
+      try {
+        const rawSrs = window.localStorage.getItem("atesto_srs_v1");
+        const obj = rawSrs ? JSON.parse(rawSrs) : {};
+        const now = Date.now();
+        const dueItems = Object.entries(obj || {})
+          .map(([slug, it]: [string, any]) => ({
+            slug,
+            dueAt: typeof it?.nextDueAt === "number" ? it.nextDueAt : 0,
+          }))
+          .filter((it) => it.dueAt > 0 && it.dueAt <= now)
+          .sort((a, b) => a.dueAt - b.dueAt);
+        const dueToday = Object.values(obj || {}).filter((it: any) => {
+          const dueAt = typeof it?.nextDueAt === "number" ? it.nextDueAt : 0;
+          return dueAt > 0 && dueAt <= now;
+        }).length;
+        setAnalyticsDueToday(dueToday);
+        setDueNowItems(dueItems);
+      } catch {
+        setAnalyticsDueToday(0);
+        setDueNowItems([]);
+      }
+
+      try {
+        const rawLast = window.localStorage.getItem("atesto:lastOpened");
+        const parsed = rawLast ? JSON.parse(rawLast) : null;
+        const at = typeof parsed?.at === "number" ? parsed.at : 0;
+        if (!at) {
+          setAnalyticsStreak(0);
+        } else {
+          const last = new Date(at);
+          const now = new Date();
+          const isToday =
+            last.getFullYear() === now.getFullYear() &&
+            last.getMonth() === now.getMonth() &&
+            last.getDate() === now.getDate();
+          setAnalyticsStreak(isToday ? 1 : 0);
+        }
+      } catch {
+        setAnalyticsStreak(0);
+      }
+
+      try {
+        const rawRead = window.localStorage.getItem("atesto:read");
+        const arr = rawRead ? JSON.parse(rawRead) : [];
+        const count = Array.isArray(arr) ? arr.length : 0;
+        setAnalyticsThisWeek(count);
+      } catch {
+        setAnalyticsThisWeek(0);
+      }
+    };
+    readRecent();
+    readDue();
+    readAnalytics();
+    const onStorage = () => {
+      readRecent();
+      readDue();
+      readAnalytics();
+    };
+    const onOpened = () => readRecent();
+    const onSrs = () => readDue();
+    const onRead = () => readAnalytics();
+    window.addEventListener("storage", onStorage);
+    window.addEventListener("atesto-opened", onOpened as EventListener);
+    window.addEventListener("atesto-srs-updated", onSrs as EventListener);
+    window.addEventListener("atesto-read-updated", onRead as EventListener);
+    return () => {
+      window.removeEventListener("storage", onStorage);
+      window.removeEventListener("atesto-opened", onOpened as EventListener);
+      window.removeEventListener("atesto-srs-updated", onSrs as EventListener);
+      window.removeEventListener("atesto-read-updated", onRead as EventListener);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const key = "mn:readEvents";
+    const appendEvent = (value: boolean) => {
+      try {
+        const raw = window.localStorage.getItem(key);
+        const arr = raw ? JSON.parse(raw) : [];
+        const next = Array.isArray(arr) ? arr : [];
+        next.push({ ts: Date.now(), value });
+        const trimmed = next.slice(-500);
+        window.localStorage.setItem(key, JSON.stringify(trimmed));
+      } catch {}
+    };
+    const computeSpark = () => {
+      try {
+        const raw = window.localStorage.getItem(key);
+        const arr = raw ? JSON.parse(raw) : [];
+        const events = Array.isArray(arr) ? arr : [];
+        const now = new Date();
+        const days: number[] = [];
+        for (let i = 6; i >= 0; i--) {
+          const d = new Date(now);
+          d.setHours(0, 0, 0, 0);
+          d.setDate(d.getDate() - i);
+          days.push(d.getTime());
+        }
+        const counts = new Array(7).fill(0);
+        for (const e of events) {
+          if (!e || typeof e.ts !== "number") continue;
+          if (!e.value) continue;
+          const d = new Date(e.ts);
+          d.setHours(0, 0, 0, 0);
+          const idx = days.indexOf(d.getTime());
+          if (idx >= 0) counts[idx] += 1;
+        }
+        setSparkCounts(counts);
+      } catch {
+        setSparkCounts(new Array(7).fill(0));
+      }
+    };
+    const onReadUpdated = () => {
+      const next = loadReadSet();
+      const prev = prevReadCountRef.current;
+      const curr = next.size;
+      if (curr !== prev) {
+        appendEvent(curr > prev);
+        prevReadCountRef.current = curr;
+      }
+      computeSpark();
+    };
+    computeSpark();
+    window.addEventListener("atesto-read-updated", onReadUpdated as EventListener);
+    return () => {
+      window.removeEventListener("atesto-read-updated", onReadUpdated as EventListener);
+    };
+  }, []);
+
   const allQuestions = useMemo(() => topics.flatMap((t) => t.questions || []), [topics]);
+  const questionTitleBySlug = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const t of topics) {
+      for (const q of t.questions || []) {
+        if (q.slug) m.set(q.slug, q.title || q.slug);
+      }
+    }
+    return m;
+  }, [topics]);
+  const dueNowVisible = useMemo(() => {
+    return dueNowItems.filter((it) => questionTitleBySlug.has(it.slug)).slice(0, 5);
+  }, [dueNowItems, questionTitleBySlug]);
 
   const globalProgress = useMemo(() => {
     const total = allQuestions.length;
@@ -121,180 +341,614 @@ export default function HomeClient(props: Props) {
     const pct = total > 0 ? Math.round((read / total) * 100) : 0;
     return { total, read, pct };
   }, [allQuestions, readSet]);
-
-  const filteredTopics = useMemo(() => {
+  const donut = useMemo(() => {
+    const radius = 44;
+    const circumference = 2 * Math.PI * radius;
+    const pct = globalProgress.pct || 0;
+    const offset = circumference - (pct / 100) * circumference;
+    return { radius, circumference, offset };
+  }, [globalProgress.pct]);
+  const byTopicStats = useMemo(() => {
     return topics
-      .filter((t) => (specialtyId ? t.specialtyId === specialtyId : true))
-      .filter((t) => (domainId ? t.domainId === domainId : true))
-      .map((topic) => {
-        const questions = (topic.questions || []).filter((it) => {
-          if (onlyPublished && it.status !== "PUBLISHED") return false;
-          if (onlyFav && !favSet.has(it.slug)) return false;
-
-          if (!q) return true;
-
-          return (
-            it.title.toLowerCase().includes(q) ||
-            it.slug.toLowerCase().includes(q) ||
-            topic.title.toLowerCase().includes(q) ||
-            topic.slug.toLowerCase().includes(q)
-          );
-        });
-
-        return { ...topic, questions };
+      .map((t) => {
+        const total = (t.questions || []).length;
+        const read = (t.questions || []).reduce((acc, q) => acc + (readSet.has(q.slug) ? 1 : 0), 0);
+        const pct = total > 0 ? Math.round((read / total) * 100) : 0;
+        return { slug: t.slug, title: t.title, read, total, pct };
       })
-      .filter((t) => (hideEmpty ? (t.questions || []).length > 0 : true));
-  }, [topics, specialtyId, domainId, onlyPublished, onlyFav, hideEmpty, q, favSet]);
-  
+      .sort((a, b) => (a.pct - b.pct) || (a.total - b.total))
+      .slice(0, 8);
+  }, [topics, readSet]);
+  const heatmapTopics = useMemo(() => {
+    return topics
+      .map((t) => {
+        const total = (t.questions || []).length;
+        const read = (t.questions || []).reduce((acc, q) => acc + (readSet.has(q.slug) ? 1 : 0), 0);
+        const pct = total > 0 ? read / total : 0;
+        return { slug: t.slug, title: t.title, read, total, pct };
+      })
+      .sort((a, b) => b.total - a.total)
+      .slice(0, 12);
+  }, [topics, readSet]);
+  const sparkLabels = useMemo(() => {
+    const now = new Date();
+    const labels: string[] = [];
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date(now);
+      d.setDate(d.getDate() - i);
+      const dayLabels = ["Ne", "Po", "Ut", "St", "Ct", "Pa", "So"];
+      labels.push(dayLabels[d.getDay()] || "");
+    }
+    return labels;
+  }, []);
+
+  const activeCategories = useMemo(() => categories.filter((c) => c.isActive !== false), [categories]);
+  const activeSubcategories = useMemo(() => subcategories.filter((s) => s.isActive !== false), [subcategories]);
+  const categoryStats = useMemo(() => {
+    return activeCategories.map((c) => {
+      const items = allQuestions.filter((q) => q.categoryId === c.id);
+      const total = items.length;
+      const read = items.reduce((acc, q) => acc + (readSet.has(q.slug) ? 1 : 0), 0);
+      const pct = total > 0 ? Math.round((read / total) * 100) : 0;
+      return { id: c.id, title: c.title, total, read, pct };
+    });
+  }, [activeCategories, allQuestions, readSet]);
+
+  const subcategoryStats = useMemo(() => {
+    return activeSubcategories.map((s) => {
+      const items = allQuestions.filter((q) => q.subcategoryId === s.id);
+      const total = items.length;
+      const read = items.reduce((acc, q) => acc + (readSet.has(q.slug) ? 1 : 0), 0);
+      const pct = total > 0 ? Math.round((read / total) * 100) : 0;
+      return { id: s.id, title: s.title, total, read, pct, categoryId: s.categoryId };
+    });
+  }, [activeSubcategories, allQuestions, readSet]);
+
+  const readsByDayMax = useMemo(() => {
+    const max = readsByDay.reduce((acc, it) => Math.max(acc, it.count), 0);
+    return max || 1;
+  }, [readsByDay]);
+
   const nextUnreadSlug = useMemo(() => {
-    return pickNextUnread(filteredTopics as any, readSet);
-  }, [filteredTopics, readSet]);
-  const continueSlug = lastOpenedSlug || nextUnreadSlug;
+    return pickNextUnread(topics as any, readSet);
+  }, [topics, readSet]);
+  const continueSlug = lastOpenedSlug || lastReadSlug || nextUnreadSlug;
 
-
-  return (
-    <main className="atesto-container atesto-stack">
-      <header className="atesto-card">
-        <div className="atesto-card-head">
-          <h1 className="atesto-h1" style={{ marginBottom: 6 }}>
-            Atesto portál
-          </h1>
-          <div className="atesto-subtle">Učení podle témat • progress • rychlé vyhledávání</div>
-        </div>
-
-        <div className="atesto-card-inner atesto-stack">
-          <div className="atesto-progress">
-            <div className="atesto-progress-row">
-              <div>
-                Celkem přečteno <b>{globalProgress.read}</b> / <b>{globalProgress.total}</b> ({globalProgress.pct}%)
+  const modules: DashboardModule[] = useMemo(
+    () => [
+      {
+        id: "dashboard-main",
+        spanClass: "mn-span-3",
+        content: (
+          <section className="atesto-card">
+            <div className="atesto-card-head">
+              <h2 className="atesto-h2">Dashboard</h2>
+            </div>
+            <div className="atesto-card-inner atesto-stack">
+              <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
+                {continueSlug ? (
+                  <Link className="atesto-btn" href={`/questions/${continueSlug}`}>
+                    Continue reading →
+                  </Link>
+                ) : (
+                  <span className="atesto-subtle">✅ Vše přečteno</span>
+                )}
+                <span className="atesto-badge">Due for review: {dueCount}</span>
+                <span className="atesto-subtle">
+                  Read: {globalProgress.read}/{globalProgress.total} ({globalProgress.pct}%)
+                </span>
               </div>
-              <button type="button" className="atesto-btn" onClick={resetFilters} style={{ marginLeft: 6 }}>
-                Reset filtry
-              </button>
-            </div>
 
-            <div className="atesto-progressbar">
-              <div className="atesto-progressbar-fill" style={{ width: `${globalProgress.pct}%` }} />
-            </div>
-
-            <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center", marginTop: 10 }}>
-              {continueSlug ? (
-                <Link className="atesto-btn" href={`/questions/${continueSlug}`}>
-                  Continue reading →
+              <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
+                <Link className="atesto-btn" href="/review">
+                  Start Review →
                 </Link>
+                <Link className="atesto-btn" href="/search">
+                  Search →
+                </Link>
+              </div>
+
+              <div className="atesto-stack">
+                <div className="atesto-subtle">Recent activity</div>
+                {recentOpened.length > 0 ? (
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                    {recentOpened.map((slug) => (
+                      <Link key={slug} className="atesto-btn atesto-btn-ghost" href={`/questions/${slug}`}>
+                        {slug}
+                      </Link>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="atesto-subtle">Zatím žádná aktivita</div>
+                )}
+              </div>
+            </div>
+          </section>
+        ),
+      },
+      {
+        id: "progress-summary",
+        content: (
+          <section className="atesto-card">
+            <div className="atesto-card-head">
+              <h3 className="atesto-h3">Progress summary</h3>
+            </div>
+            <div className="atesto-card-inner atesto-stack">
+              <div className="atesto-subtle">
+                Celkem: <b>{globalProgress.total}</b>
+              </div>
+              <div className="atesto-subtle">
+                Přečteno: <b>{globalProgress.read}</b> ({globalProgress.pct}%)
+              </div>
+              <div className="atesto-progressbar">
+                <div className="atesto-progressbar-fill" style={{ width: `${globalProgress.pct}%` }} />
+              </div>
+            </div>
+          </section>
+        ),
+      },
+      {
+        id: "quick-actions",
+        content: (
+          <section className="atesto-card">
+            <div className="atesto-card-head">
+              <h3 className="atesto-h3">Quick actions</h3>
+            </div>
+            <div className="atesto-card-inner atesto-stack">
+              <Link className="atesto-btn" href="/read">
+                Start reading →
+              </Link>
+              <Link className="atesto-btn" href="/review">
+                Review due →
+              </Link>
+              <Link className="atesto-btn" href="/search">
+                Search →
+              </Link>
+            </div>
+          </section>
+        ),
+      },
+      {
+        id: "progress-graphs",
+        spanClass: "mn-span-2",
+        content: (
+          <section className="atesto-card">
+            <div className="atesto-card-head">
+              <h3 className="atesto-h3">Progress graphs</h3>
+            </div>
+            <div className="atesto-card-inner atesto-stack">
+              <div style={{ display: "grid", gap: 12, gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))" }}>
+                <div className="mn-donut">
+                  <svg width="120" height="120" viewBox="0 0 120 120" aria-hidden="true">
+                    <circle className="mn-donut-track" cx="60" cy="60" r={donut.radius} />
+                    <circle
+                      className="mn-donut-ring"
+                      cx="60"
+                      cy="60"
+                      r={donut.radius}
+                      strokeDasharray={`${donut.circumference} ${donut.circumference}`}
+                      strokeDashoffset={donut.offset}
+                    />
+                  </svg>
+                  <div className="mn-donut-center">
+                    <div className="atesto-h2">{globalProgress.pct}%</div>
+                    <div className="atesto-subtle">
+                      {globalProgress.read}/{globalProgress.total}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="atesto-stack mn-spark">
+                  <div className="mn-spark-bars">
+                    {sparkCounts.map((v, i) => (
+                      <div key={`${i}-${v}`} className="mn-spark-bar">
+                        <div className="mn-spark-fill" style={{ height: `${Math.min(100, v * 20)}%` }} />
+                      </div>
+                    ))}
+                  </div>
+                  <div className="mn-spark-labels">
+                    {sparkLabels.map((l, i) => (
+                      <span key={`${l}-${i}`}>{l}</span>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="mn-heat">
+                  {heatmapTopics.map((t) => (
+                    <div
+                      key={t.slug}
+                      className="mn-heat-cell"
+                      title={`${t.title} — ${t.read}/${t.total}`}
+                      style={{ opacity: Math.max(0.15, Math.min(1, t.pct || 0)) }}
+                    />
+                  ))}
+                </div>
+              </div>
+            </div>
+          </section>
+        ),
+      },
+      {
+        id: "progress-category",
+        spanClass: "mn-span-2",
+        content: (
+          <section className="atesto-card">
+            <div className="atesto-card-head">
+              <h3 className="atesto-h3">Progress by category</h3>
+            </div>
+            <div className="atesto-card-inner atesto-stack">
+              {categoryStats.length > 0 ? (
+                <div className="atesto-stack">
+                  {categoryStats.map((c) => (
+                    <div key={c.id} style={{ display: "grid", gap: 6 }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+                        <Link className="atesto-btn atesto-btn-ghost" href={`/read?categoryId=${c.id}`}>
+                          {c.title}
+                        </Link>
+                        <div className="atesto-subtle">
+                          {c.read}/{c.total} • {c.pct}%
+                        </div>
+                      </div>
+                      <div className="atesto-progressbar">
+                        <div className="atesto-progressbar-fill" style={{ width: `${c.pct}%` }} />
+                      </div>
+                    </div>
+                  ))}
+                </div>
               ) : (
-                <span className="atesto-subtle">✅ Vše v aktuálním filtru přečteno</span>
+                <div className="atesto-subtle">Žádné kategorie</div>
               )}
             </div>
-
-            <div className="atesto-filters">
-              {/* MVP2: Specialty + Domain */}
-              <select className="atesto-input" value={specialtyId} onChange={(e) => setSpecialtyId(e.target.value)}>
-                <option value="">Specialty (vše)</option>
-                {specialties
-                  .slice()
-                  .sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
-                  .map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.title}
-                    </option>
-                  ))}
-              </select>
-
-              <select className="atesto-input" value={domainId} onChange={(e) => setDomainId(e.target.value)}>
-                <option value="">Domain (vše)</option>
-                {domains
-                  .slice()
-                  .sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
-                  .map((d) => (
-                    <option key={d.id} value={d.id}>
-                      {d.title}
-                    </option>
-                  ))}
-              </select>
-
-              <input
-                className="atesto-input"
-                placeholder="Hledej (např. hojení, lipofilling, jizvy…)"
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-              />
-
-              <label className="atesto-check">
-                <input type="checkbox" checked={onlyPublished} onChange={(e) => setOnlyPublished(e.target.checked)} />
-                Jen PUBLISHED
-              </label>
-
-              <label className="atesto-check">
-                <input type="checkbox" checked={onlyFav} onChange={(e) => setOnlyFav(e.target.checked)} />
-                Jen oblíbené
-              </label>
-
-              <label className="atesto-check">
-                <input type="checkbox" checked={hideEmpty} onChange={(e) => setHideEmpty(e.target.checked)} />
-                Skrýt prázdná
-              </label>
+          </section>
+        ),
+      },
+      {
+        id: "reads-7-days",
+        content: (
+          <section className="atesto-card">
+            <div className="atesto-card-head">
+              <h3 className="atesto-h3">Reads last 7 days</h3>
             </div>
-          </div>
-        </div>
-      </header>
-
-      <section className="atesto-stack">
-        {filteredTopics.map((t) => (
-          <div key={t.slug} className="atesto-card">
-            <div className="atesto-card-inner">
-              <div className="atesto-topic-row">
-                <div className="atesto-topic-left">
-                  <div className="atesto-topic-title" style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-                    <span className="atesto-pill">{t.order}</span>
-                    <strong>{t.title}</strong>
-                      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                        {t.specialtyId && specialtyById.get(t.specialtyId) ? (
-                          <button type="button" className="atesto-badge atesto-badge-ok" title="Filtrovat podle specialty" onClick={() => { setSpecialtyId(t.specialtyId || ""); /*setDomainId("");*/ }}>{specialtyById.get(t.specialtyId)?.title}</button>
-                        ) : null}
-                        {t.domainId && domainById.get(t.domainId) ? (
-                          <button type="button" className="atesto-badge" title="Filtrovat podle domény" onClick={() => { setDomainId(t.domainId || ""); /*setSpecialtyId("");*/ }}>{domainById.get(t.domainId)?.title}</button>
-                        ) : null}
-                      </div>
+            <div className="atesto-card-inner atesto-stack">
+              <div style={{ display: "grid", gap: 8 }}>
+                {readsByDay.map((d) => (
+                  <div key={d.date} style={{ display: "grid", gridTemplateColumns: "90px 1fr 40px", gap: 8, alignItems: "center" }}>
+                    <div className="atesto-subtle">{d.date}</div>
+                    <div className="atesto-progressbar" style={{ height: 8 }}>
+                      <div className="atesto-progressbar-fill" style={{ width: `${Math.round((d.count / readsByDayMax) * 100)}%` }} />
+                    </div>
+                    <div className="atesto-subtle" style={{ textAlign: "right" }}>{d.count}</div>
                   </div>
-                  <div className="atesto-subtle">{t.slug}</div>
-                </div>
-
-                <Link className="atesto-btn atesto-btn-ghost" href={`/topics/${t.slug}`}>
-                  Otevřít →
-                </Link>
+                ))}
               </div>
-
-              {(t.questions || []).length === 0 ? (
-                <div className="atesto-subtle" style={{ marginTop: 8 }}>
-                  Žádné otázky (nebo skryté filtrem).
+            </div>
+          </section>
+        ),
+      },
+      {
+        id: "progress-subcategory",
+        content: (
+          <section className="atesto-card">
+            <div className="atesto-card-head">
+              <h3 className="atesto-h3">Progress by subcategory</h3>
+            </div>
+            <div className="atesto-card-inner atesto-stack">
+              {subcategoryStats.length > 0 ? (
+                <div style={{ display: "grid", gap: 8 }}>
+                  {subcategoryStats.map((s) => (
+                    <div key={s.id} style={{ display: "grid", gap: 6 }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+                        <div>{s.title}</div>
+                        <div className="atesto-subtle">
+                          {s.read}/{s.total} • {s.pct}%
+                        </div>
+                      </div>
+                      <div className="atesto-progressbar">
+                        <div className="atesto-progressbar-fill" style={{ width: `${s.pct}%` }} />
+                      </div>
+                    </div>
+                  ))}
                 </div>
               ) : (
-                <div className="atesto-qgrid">
-                  {t.questions.map((it) => (
-                    <Link key={it.slug} className="atesto-qitem" href={`/questions/${it.slug}`}>
-                      <div className="atesto-qitem-head">
-                        <div className="atesto-qitem-title">{it.title}</div>
-                        <span className={it.status === "PUBLISHED" ? "atesto-badge atesto-badge-ok" : "atesto-badge"}>
-                          {it.status}
-                        </span>
-{" "}
-{readSet.has(it.slug) ? <span className="atesto-badge atesto-badge-ok">READ</span> : null}
-{it.kind ? <span className="atesto-badge">{it.kind}</span> : null}
-{it.source ? <span className="atesto-badge">{it.source}</span> : null}
-
+                <div className="atesto-subtle">Žádné subkategorie</div>
+              )}
+            </div>
+          </section>
+        ),
+      },
+      {
+        id: "flashcards",
+        content: (
+          <section className="atesto-card">
+            <div className="atesto-card-head">
+              <h3 className="atesto-h3">Flashcards</h3>
+              <div className="atesto-subtle">MVP2: rychlé opakování (coming soon)</div>
+            </div>
+            <div className="atesto-card-inner atesto-stack">
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                <button className="atesto-btn" disabled style={{ opacity: 0.6, cursor: "not-allowed" }}>
+                  Start Flashcards
+                </button>
+                <button className="atesto-btn atesto-btn-ghost" disabled style={{ opacity: 0.6, cursor: "not-allowed" }}>
+                  Create deck
+                </button>
+              </div>
+              <div className="atesto-stack">
+                <div className="atesto-subtle">Perforátory – definice</div>
+                <div className="atesto-subtle">CTS – klinika</div>
+                <div className="atesto-subtle">Kožní štěp – indikace</div>
+              </div>
+            </div>
+          </section>
+        ),
+      },
+      {
+        id: "mcq",
+        content: (
+          <section className="atesto-card">
+            <div className="atesto-card-head">
+              <h3 className="atesto-h3">MCQ</h3>
+              <div className="atesto-subtle">MVP2: testování znalostí (coming soon)</div>
+            </div>
+            <div className="atesto-card-inner atesto-stack">
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                <button className="atesto-btn" disabled style={{ opacity: 0.6, cursor: "not-allowed" }}>
+                  Start quiz
+                </button>
+                <button className="atesto-btn atesto-btn-ghost" disabled style={{ opacity: 0.6, cursor: "not-allowed" }}>
+                  Generate quiz
+                </button>
+              </div>
+              <div className="atesto-subtle">Status: 0 quizzes • 0 attempts</div>
+            </div>
+          </section>
+        ),
+      },
+      {
+        id: "by-topic",
+        spanClass: "mn-span-3",
+        content: (
+          <section className="atesto-card">
+            <div className="atesto-card-head">
+              <h3 className="atesto-h3">By topic (top 8)</h3>
+            </div>
+            <div className="atesto-card-inner atesto-stack">
+              {byTopicStats.length > 0 ? (
+                <div className="atesto-stack">
+                  {byTopicStats.map((t) => (
+                    <div key={t.slug} style={{ display: "grid", gap: 6 }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+                        <div>{t.title}</div>
+                        <div className="atesto-subtle">
+                          {t.read}/{t.total} • {t.pct}%
+                        </div>
                       </div>
-                      <div className="atesto-qitem-sub">
-                        <span className="atesto-subtle">{it.slug}</span>
+                      <div className="atesto-progressbar">
+                        <div className="atesto-progressbar-fill" style={{ width: `${t.pct}%` }} />
                       </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="atesto-subtle">Žádná data k zobrazení</div>
+              )}
+            </div>
+          </section>
+        ),
+      },
+      {
+        id: "logbook",
+        content: (
+          <section className="atesto-card">
+            <div className="atesto-card-head">
+              <h3 className="atesto-h3">Logbook</h3>
+              <div className="atesto-subtle">MVP2: výkonový deník a portfolio (coming soon)</div>
+            </div>
+            <div className="atesto-card-inner atesto-stack">
+              <div className="atesto-stack">
+                <div className="atesto-subtle">Date | Procedure | Note</div>
+                <div className="atesto-subtle">2026-01-12 | CTS release | asistence</div>
+                <div className="atesto-subtle">2026-01-10 | STSG | 3% TBSA</div>
+                <div className="atesto-subtle">2026-01-08 | Dupuytren | fasciektomie</div>
+              </div>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                <button className="atesto-btn" disabled style={{ opacity: 0.6, cursor: "not-allowed" }}>
+                  Add entry
+                </button>
+                <button className="atesto-btn atesto-btn-ghost" disabled style={{ opacity: 0.6, cursor: "not-allowed" }}>
+                  Export PDF
+                </button>
+              </div>
+            </div>
+          </section>
+        ),
+      },
+      {
+        id: "analytics",
+        content: (
+          <section className="atesto-card">
+            <div className="atesto-card-head">
+              <h3 className="atesto-h3">Analytics</h3>
+              <div className="atesto-subtle">MVP2: přehled učení a aktivity (coming soon)</div>
+            </div>
+            <div className="atesto-card-inner atesto-stack">
+              <div className="atesto-subtle">Streak: {analyticsStreak} dní</div>
+              <div className="atesto-subtle">This week (approx): {analyticsThisWeek} přečteno</div>
+              <div className="atesto-subtle">Due today: {analyticsDueToday}</div>
+              <div>
+                <button className="atesto-btn" disabled style={{ opacity: 0.6, cursor: "not-allowed" }}>
+                  Open dashboard
+                </button>
+              </div>
+            </div>
+          </section>
+        ),
+      },
+      {
+        id: "due-now",
+        spanClass: "mn-span-3",
+        content: (
+          <section className="atesto-card">
+            <div className="atesto-card-head">
+              <h3 className="atesto-h3">Due now</h3>
+            </div>
+            <div className="atesto-card-inner atesto-stack">
+              {dueNowVisible.length > 0 ? (
+                <div className="atesto-stack">
+                  {dueNowVisible.map((it) => (
+                    <Link key={it.slug} className="atesto-btn atesto-btn-ghost" href={`/questions/${it.slug}`}>
+                      {questionTitleBySlug.get(it.slug)} <span className="atesto-badge">DUE</span>
                     </Link>
                   ))}
                 </div>
+              ) : (
+                <div className="atesto-subtle">Nic k opakování 🎉</div>
               )}
+
+              <div>
+                <Link className="atesto-btn" href="/review">
+                  Open Review →
+                </Link>
+              </div>
+            </div>
+          </section>
+        ),
+      },
+    ],
+    [
+      analyticsDueToday,
+      analyticsStreak,
+      analyticsThisWeek,
+      byTopicStats,
+      categoryStats,
+      continueSlug,
+      dueCount,
+      dueNowVisible,
+      globalProgress,
+      heatmapTopics,
+      questionTitleBySlug,
+      readsByDay,
+      readsByDayMax,
+      recentOpened,
+      sparkCounts,
+      sparkLabels,
+      subcategoryStats,
+    ]
+  );
+
+  const orderedModules = useMemo(() => {
+    const base = modules.map((m) => m.id);
+    const order = layoutEnabled && layoutOrder.length ? layoutOrder : base;
+    const map = new Map(modules.map((m) => [m.id, m]));
+    const list = order.map((id) => map.get(id)).filter(Boolean) as DashboardModule[];
+    for (const m of modules) if (!order.includes(m.id)) list.push(m);
+    return list;
+  }, [modules, layoutEnabled, layoutOrder]);
+
+  useEffect(() => {
+    if (!layoutEnabled) return;
+    if (typeof window === "undefined") return;
+    try {
+      const next = layoutOrder.length ? layoutOrder : modules.map((m) => m.id);
+      window.localStorage.setItem("mn:dashboardLayout:v1", JSON.stringify(next));
+    } catch {}
+  }, [layoutEnabled, layoutOrder, modules]);
+
+  const handleDrop = (targetId: string) => (e: DragEvent<HTMLDivElement>) => {
+    if (!layoutEnabled) return;
+    e.preventDefault();
+    const dragId = dragIdRef.current || e.dataTransfer.getData("text/plain");
+    if (!dragId || dragId === targetId) return;
+    const base = layoutOrder.length ? layoutOrder : modules.map((m) => m.id);
+    const next = base.filter((id) => id !== dragId);
+    const idx = next.indexOf(targetId);
+    next.splice(idx < 0 ? next.length : idx, 0, dragId);
+    setLayoutOrder(next);
+  };
+
+  const handleDragStart = (id: string) => (e: DragEvent<HTMLDivElement>) => {
+    if (!layoutEnabled) return;
+    dragIdRef.current = id;
+    e.dataTransfer.effectAllowed = "move";
+    e.dataTransfer.setData("text/plain", id);
+  };
+
+  const handleDragOver = (e: DragEvent<HTMLDivElement>) => {
+    if (!layoutEnabled) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+  };
+
+  return (
+    <main className="atesto-container">
+      <div
+        className="mn-dashboard-grid"
+        style={{ display: "grid", gap: 16, gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", width: "100%" }}
+      >
+        <header className="atesto-card mn-span-3">
+          <div className="atesto-card-head">
+            <h1 className="atesto-h1" style={{ marginBottom: 6 }}>
+              Dashboard
+            </h1>
+            <div className="atesto-subtle">MedNexus Dashboard</div>
+          </div>
+
+          <div className="atesto-card-inner atesto-stack">
+            <div style={{ display: "flex", justifyContent: "flex-end" }}>
+              <button
+                className="atesto-btn atesto-btn-ghost"
+                type="button"
+                onClick={() => setLayoutEnabled((v) => !v)}
+              >
+                {layoutEnabled ? "Done" : "Customize layout"}
+              </button>
+            </div>
+            <div className="atesto-progress">
+              <div className="atesto-progress-row">
+                <div>
+                  Celkem přečteno <b>{globalProgress.read}</b> / <b>{globalProgress.total}</b> ({globalProgress.pct}%)
+                </div>
+              </div>
+
+              <div className="atesto-progressbar">
+                <div className="atesto-progressbar-fill" style={{ width: `${globalProgress.pct}%` }} />
+              </div>
+
+              <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center", marginTop: 10 }}>
+                {continueSlug ? (
+                  <Link className="atesto-btn" href={`/questions/${continueSlug}`}>
+                    Continue reading →
+                  </Link>
+                ) : (
+                  <span className="atesto-subtle">✅ Vše přečteno</span>
+                )}
+              </div>
             </div>
           </div>
+        </header>
+
+        {orderedModules.map((m) => (
+          <div
+            key={m.id}
+            className={m.spanClass}
+            draggable={layoutEnabled}
+            onDragStart={handleDragStart(m.id)}
+            onDragOver={handleDragOver}
+            onDrop={handleDrop(m.id)}
+            style={{ position: "relative" }}
+          >
+            {layoutEnabled ? (
+              <span
+                className="atesto-badge"
+                style={{ position: "absolute", top: 10, right: 10, cursor: "grab", zIndex: 2 }}
+              >
+                drag
+              </span>
+            ) : null}
+            {m.content}
+          </div>
         ))}
-      </section>
+      </div>
     </main>
   );
 }

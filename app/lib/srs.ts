@@ -1,6 +1,7 @@
 export const SRS_KEY = "atesto_srs_v1";
 
-export type SrsItem = { dueAt: number; intervalDays: number; ease: number };
+export type SrsGrade = "hard" | "ok" | "easy";
+export type SrsItem = { nextDueAt: number; intervalDays: number; lastGrade: SrsGrade | null };
 
 function loadObj(): Record<string, SrsItem> {
   if (typeof window === "undefined") return {};
@@ -9,7 +10,23 @@ function loadObj(): Record<string, SrsItem> {
     if (!raw) return {};
     const obj = JSON.parse(raw);
     if (!obj || typeof obj !== "object") return {};
-    return obj as Record<string, SrsItem>;
+    const out: Record<string, SrsItem> = {};
+    for (const slug of Object.keys(obj)) {
+      const it = (obj as Record<string, any>)[slug] || {};
+      const nextDueAt =
+        typeof it.nextDueAt === "number"
+          ? it.nextDueAt
+          : typeof it.dueAt === "number"
+            ? it.dueAt
+            : 0;
+      const intervalDays = typeof it.intervalDays === "number" ? it.intervalDays : 0;
+      const lastGrade =
+        it.lastGrade === "hard" || it.lastGrade === "ok" || it.lastGrade === "easy"
+          ? it.lastGrade
+          : null;
+      out[slug] = { nextDueAt, intervalDays, lastGrade };
+    }
+    return out;
   } catch {
     return {};
   }
@@ -22,7 +39,7 @@ function saveObj(obj: Record<string, SrsItem>) {
 
 export function addToReview(slug: string) {
   const obj = loadObj();
-  if (!obj[slug]) obj[slug] = { dueAt: Date.now(), intervalDays: 1, ease: 2.3 };
+  if (!obj[slug]) obj[slug] = { nextDueAt: Date.now(), intervalDays: 0, lastGrade: null };
   saveObj(obj);
 }
 
@@ -32,18 +49,24 @@ export function removeFromReview(slug: string) {
   saveObj(obj);
 }
 
-export function markReviewed(slug: string) {
+export function markReviewed(slug: string, grade: SrsGrade) {
   const obj = loadObj();
-  const it = obj[slug] || { dueAt: Date.now(), intervalDays: 1, ease: 2.3 };
+  const it = obj[slug] || { nextDueAt: Date.now(), intervalDays: 0, lastGrade: null };
+  const prevInterval = typeof it.intervalDays === "number" ? it.intervalDays : 0;
+  let nextInterval = 0;
 
-  // super jednoduché: interval roste cca *2, ease mírně roste
-  const nextInterval = Math.min(60, Math.round(it.intervalDays * 2));
-  const nextEase = Math.min(2.8, it.ease + 0.05);
+  if (grade === "hard") {
+    nextInterval = prevInterval > 0 ? Math.max(1, Math.round(prevInterval * 0.5)) : 1;
+  } else if (grade === "ok") {
+    nextInterval = prevInterval > 0 ? Math.max(1, Math.round(prevInterval * 2)) : 3;
+  } else {
+    nextInterval = prevInterval > 0 ? Math.max(1, Math.round(prevInterval * 3)) : 7;
+  }
 
   obj[slug] = {
-    dueAt: Date.now() + nextInterval * 24 * 60 * 60 * 1000,
+    nextDueAt: Date.now() + nextInterval * 24 * 60 * 60 * 1000,
     intervalDays: nextInterval,
-    ease: nextEase,
+    lastGrade: grade,
   };
   saveObj(obj);
 }
@@ -51,13 +74,25 @@ export function markReviewed(slug: string) {
 export function listDue(): string[] {
   const obj = loadObj();
   const now = Date.now();
-  return Object.keys(obj).filter((slug) => {
-    const dueAt = typeof obj[slug]?.dueAt === "number" ? obj[slug].dueAt : 0;
-    return dueAt <= now;
-  });
+  return Object.keys(obj)
+    .filter((slug) => {
+      const dueAt = typeof obj[slug]?.nextDueAt === "number" ? obj[slug].nextDueAt : 0;
+      return dueAt <= now;
+    })
+    .sort((a, b) => {
+      const aDue = typeof obj[a]?.nextDueAt === "number" ? obj[a].nextDueAt : 0;
+      const bDue = typeof obj[b]?.nextDueAt === "number" ? obj[b].nextDueAt : 0;
+      return aDue - bDue;
+    });
 }
 
 export function isInReview(slug: string): boolean {
   const obj = loadObj();
   return !!obj[slug];
+}
+
+export function isDue(slug: string): boolean {
+  const obj = loadObj();
+  const dueAt = typeof obj[slug]?.nextDueAt === "number" ? obj[slug].nextDueAt : 0;
+  return dueAt > 0 && dueAt <= Date.now();
 }

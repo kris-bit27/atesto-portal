@@ -1,10 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { useTaxonomyFilters } from "@/app/lib/useTaxonomyFilters";
-type Q = { slug: string; title: string; status: "DRAFT" | "PUBLISHED" };
+type Q = { slug: string; title: string; status: "DRAFT" | "PUBLISHED"; categoryId?: string | null; subcategoryId?: string | null };
 type Topic = {
   id: string;
   title: string;
@@ -15,12 +16,14 @@ type Topic = {
   questions: Q[];
 };
 
-type Tax = { id: string; slug: string; title: string; order?: number };
+type Tax = { id: string; slug: string; title: string; order?: number; isActive?: boolean };
 
 type Props = {
   topics: Topic[];
   specialties?: Tax[];
   domains?: Tax[];
+  categories?: Tax[];
+  subcategories?: (Tax & { categoryId: string })[];
 };
 
 function makeIdMap(arr: {id: string}[]) {
@@ -41,7 +44,7 @@ function getSet(key: string) {
   }
 }
 
-export default function ReadClient({ topics, specialties = [], domains = [] }: Props) {
+export default function ReadClient({ topics, specialties = [], domains = [], categories = [], subcategories = [] }: Props) {
   const {
     query,
     setQuery,
@@ -56,11 +59,30 @@ export default function ReadClient({ topics, specialties = [], domains = [] }: P
     setSpecialtyId,
     domainId,
     setDomainId,
+    categoryId,
+    setCategoryId,
+    subcategoryId,
+    setSubcategoryId,
     resetFilters,
-  } = useTaxonomyFilters({ defaultHideEmpty: true });
-useEffect(() => {
+  } = useTaxonomyFilters({ defaultHideEmpty: true, defaultOnlyPublished: true });
+  const searchParams = useSearchParams();
+  useEffect(() => {
     if (specialtyId) setDomainId("");
   }, [specialtyId, setDomainId]);
+  useEffect(() => {
+    if (categoryId) setSubcategoryId("");
+  }, [categoryId, setSubcategoryId]);
+
+  const initFromQueryRef = useRef(false);
+  useEffect(() => {
+    if (initFromQueryRef.current) return;
+    if (!searchParams) return;
+    const cat = searchParams.get("categoryId") || "";
+    const sub = searchParams.get("subcategoryId") || "";
+    if (cat) setCategoryId(cat);
+    if (sub) setSubcategoryId(sub);
+    initFromQueryRef.current = true;
+  }, [searchParams, setCategoryId, setSubcategoryId, initFromQueryRef]);
 
   const [favSet, setFavSet] = useState<Set<string>>(new Set());
   const [readSet, setReadSet] = useState<Set<string>>(new Set());
@@ -90,6 +112,32 @@ useEffect(() => {
     return m;
   }, [domains]);
 
+  const activeCategories = useMemo(() => {
+    return categories.filter((c) => c.isActive !== false);
+  }, [categories]);
+
+  const activeSubcategories = useMemo(() => {
+    return subcategories.filter((s) => s.isActive !== false);
+  }, [subcategories]);
+
+  const categoryById = useMemo(() => {
+    const m = new Map<string, Tax>();
+    for (const it of activeCategories) m.set(it.id, it);
+    return m;
+  }, [activeCategories]);
+
+  const subcategoryById = useMemo(() => {
+    const m = new Map<string, Tax & { categoryId: string }>();
+    for (const it of activeSubcategories) m.set(it.id, it as Tax & { categoryId: string });
+    return m;
+  }, [activeSubcategories]);
+
+  const filteredSubcategories = useMemo(() => {
+    const list = activeSubcategories;
+    if (!categoryId) return list;
+    return list.filter((s) => s.categoryId === categoryId);
+  }, [activeSubcategories, categoryId]);
+
   const filteredTopics = useMemo(() => {
     return topics
       .filter((t) => (specialtyId ? t.specialtyId === specialtyId : true))
@@ -98,6 +146,8 @@ useEffect(() => {
         const questions = (topic.questions || []).filter((it) => {
           if (onlyPublished && it.status !== "PUBLISHED") return false;
           if (onlyFav && !favSet.has(it.slug)) return false;
+          if (categoryId && it.categoryId !== categoryId) return false;
+          if (subcategoryId && it.subcategoryId !== subcategoryId) return false;
 
           if (!q) return true;
 
@@ -112,7 +162,7 @@ useEffect(() => {
         return { ...topic, questions };
       })
       .filter((t) => (hideEmpty ? (t.questions || []).length > 0 : true));
-  }, [topics, specialtyId, domainId, onlyPublished, onlyFav, hideEmpty, q, favSet]);
+  }, [topics, specialtyId, domainId, categoryId, subcategoryId, onlyPublished, onlyFav, hideEmpty, q, favSet]);
 
   const counts = useMemo(() => {
     const all = filteredTopics.flatMap((t) => t.questions || []);
@@ -122,6 +172,159 @@ useEffect(() => {
     return { total, read, pct };
   }, [filteredTopics, readSet]);
 
+  const domainList = useMemo(() => {
+    return domains.slice().sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+  }, [domains]);
+
+  const chapterTopics = useMemo(() => {
+    return filteredTopics.filter((t) => t.slug.startsWith("ch-"));
+  }, [filteredTopics]);
+
+  const legacyTopics = useMemo(() => {
+    if (domainList.length === 0) return filteredTopics;
+    return filteredTopics.filter((t) => !t.slug.startsWith("ch-") || !t.domainId);
+  }, [filteredTopics, domainList.length]);
+
+  const domainGroups = useMemo(() => {
+    if (domainList.length === 0) return [];
+    const map = new Map<string, Topic[]>();
+    for (const t of chapterTopics) {
+      if (!t.domainId) continue;
+      const arr = map.get(t.domainId) || [];
+      arr.push(t);
+      map.set(t.domainId, arr);
+    }
+    return domainList
+      .map((d) => {
+        const topics = (map.get(d.id) || []).slice().sort((a, b) => {
+          const byOrder = (a.order ?? 0) - (b.order ?? 0);
+          if (byOrder !== 0) return byOrder;
+          return a.title.localeCompare(b.title);
+        });
+        const questionCount = topics.reduce((acc, t) => acc + (t.questions || []).length, 0);
+        return { domain: d, topics, questionCount };
+      })
+      .filter((g) => g.topics.length > 0);
+  }, [domainList, chapterTopics]);
+
+  const legacyCounts = useMemo(() => {
+    const total = legacyTopics.reduce((acc, t) => acc + (t.questions || []).length, 0);
+    return { topics: legacyTopics.length, total };
+  }, [legacyTopics]);
+
+  const renderTopic = (t: Topic) => (
+    <div key={t.id} className="atesto-card">
+      <div
+        className="atesto-card-head"
+        style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center", flexWrap: "wrap" }}
+      >
+        <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
+          <div className="atesto-badge">{t.order}</div>
+          <div>
+            <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+              <strong>{t.title}</strong>
+
+              {t.specialtyId && specialtyById.get(t.specialtyId) ? (
+                <button
+                  type="button"
+                  className="atesto-badge atesto-badge-ok"
+                  title="Filtrovat podle specialty"
+                  onClick={() => {
+                    setSpecialtyId(t.specialtyId || "");
+                    /*setDomainId("");*/
+                  }}
+                >
+                  {specialtyById.get(t.specialtyId)?.title}
+                </button>
+              ) : null}
+              {t.domainId && domainById.get(t.domainId) ? (
+                <button
+                  type="button"
+                  className="atesto-badge"
+                  title="Filtrovat podle domény"
+                  onClick={() => {
+                    setDomainId(t.domainId || "");
+                    /*setSpecialtyId("");*/
+                  }}
+                >
+                  {domainById.get(t.domainId)?.title}
+                </button>
+              ) : null}
+            </div>
+            <div className="atesto-subtle">{t.slug}</div>
+          </div>
+        </div>
+
+        <Link className="atesto-btn atesto-btn-ghost" href={`/topics/${t.slug}`}>
+          Otevřít →
+        </Link>
+      </div>
+
+      <div className="atesto-card-inner">
+        {(t.questions || []).length === 0 ? (
+          <div className="atesto-subtle">Žádné otázky (nebo skryté filtrem).</div>
+        ) : (
+          <div className="atesto-grid">
+            {t.questions.map((q) => {
+              const category = q.categoryId ? categoryById.get(q.categoryId) : undefined;
+              const subcategory = q.subcategoryId ? subcategoryById.get(q.subcategoryId) : undefined;
+              return (
+                <Link key={q.slug} className="atesto-card atesto-card-mini" href={`/questions/${q.slug}`}>
+                  <div className="atesto-card-inner atesto-stack" style={{ gap: 6 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center" }}>
+                    <strong>{q.title}</strong>
+                    <span className={q.status === "PUBLISHED" ? "atesto-badge atesto-badge-ok" : "atesto-badge"}>
+                      {q.status}
+                    </span>
+                  </div>
+                  {category || subcategory ? (
+                    <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                      {category ? (
+                        <button
+                          type="button"
+                          className="atesto-badge atesto-badge-ok"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            setCategoryId(q.categoryId as string);
+                            setSubcategoryId("");
+                            window.scrollTo({ top: 0, behavior: "smooth" });
+                          }}
+                        >
+                          {category.title}
+                        </button>
+                      ) : null}
+                      {subcategory ? (
+                        <button
+                          type="button"
+                          className="atesto-badge"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            setSubcategoryId(q.subcategoryId as string);
+                            if (!categoryId && subcategory.categoryId) {
+                              setCategoryId(subcategory.categoryId);
+                            }
+                            window.scrollTo({ top: 0, behavior: "smooth" });
+                          }}
+                        >
+                          {subcategory.title}
+                        </button>
+                      ) : null}
+                    </div>
+                  ) : null}
+                  <div className="atesto-subtle" style={{ display: "flex", justifyContent: "space-between", gap: 10 }}>
+                    <span>{q.slug}</span>
+                    <span>{readSet.has(q.slug) ? "✓ READ" : ""}</span>
+                  </div>
+                  </div>
+                </Link>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+
   return (
     <main className="atesto-container atesto-stack">
       <header className="atesto-card">
@@ -129,7 +332,7 @@ useEffect(() => {
           <h1 className="atesto-h1" style={{ marginBottom: 6 }}>
             Read
           </h1>
-          <div className="atesto-subtle">Filtry jako Home • čtení podle taxonomy</div>
+          <div className="atesto-subtle">Filtry jako Dashboard • čtení podle taxonomy</div>
         </div>
 
         <div className="atesto-card-inner atesto-stack">
@@ -162,6 +365,28 @@ useEffect(() => {
             </select>
               <button type="button" className="atesto-btn" onClick={resetFilters}>Reset</button>
 
+            <select className="atesto-input" value={categoryId} onChange={(e) => setCategoryId(e.target.value)}>
+              <option value="">Všechny kategorie</option>
+              {activeCategories.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.title}
+                </option>
+              ))}
+            </select>
+
+            <select
+              className="atesto-input"
+              value={subcategoryId}
+              onChange={(e) => setSubcategoryId(e.target.value)}
+              disabled={!filteredSubcategories.length}
+            >
+              <option value="">Všechny subkategorie</option>
+              {filteredSubcategories.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.title}
+                </option>
+              ))}
+            </select>
 
             <label className="atesto-subtle" style={{ display: "flex", gap: 8, alignItems: "center" }}>
               <input type="checkbox" checked={onlyPublished} onChange={(e) => setOnlyPublished(e.target.checked)} />
@@ -188,58 +413,35 @@ useEffect(() => {
 
       {/* Topics + questions */}
       <section className="atesto-stack">
-        {filteredTopics.map((t) => (
-          <div key={t.id} className="atesto-card">
-            <div className="atesto-card-head" style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
-              <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
-                <div className="atesto-badge">{t.order}</div>
+        {domainGroups.map((g) => (
+          <section key={g.domain.id} className="atesto-stack">
+            <div className="atesto-card">
+              <div className="atesto-card-head" style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
                 <div>
-                  <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-                    <strong>{t.title}</strong>
-
-                    {/* badges */}
-                    {t.specialtyId && specialtyById.get(t.specialtyId) ? (
-                      <button type="button" className="atesto-badge atesto-badge-ok" title="Filtrovat podle specialty" onClick={() => { setSpecialtyId(t.specialtyId || ""); /*setDomainId("");*/ }}>{specialtyById.get(t.specialtyId)?.title}</button>
-                    ) : null}
-                    {t.domainId && domainById.get(t.domainId) ? (
-                      <button type="button" className="atesto-badge" title="Filtrovat podle domény" onClick={() => { setDomainId(t.domainId || ""); /*setSpecialtyId("");*/ }}>{domainById.get(t.domainId)?.title}</button>
-                    ) : null}
+                  <h2 className="atesto-h2" style={{ margin: 0 }}>{g.domain.title}</h2>
+                  <div className="atesto-subtle">
+                    {g.topics.length} témat • {g.questionCount} otázek
                   </div>
-                  <div className="atesto-subtle">{t.slug}</div>
                 </div>
               </div>
-
-              <Link className="atesto-btn atesto-btn-ghost" href={`/topics/${t.slug}`}>
-                Otevřít →
-              </Link>
             </div>
-
-            <div className="atesto-card-inner">
-              {(t.questions || []).length === 0 ? (
-                <div className="atesto-subtle">Žádné otázky (nebo skryté filtrem).</div>
-              ) : (
-                <div className="atesto-grid">
-                  {t.questions.map((q) => (
-                    <Link key={q.slug} className="atesto-card atesto-card-mini" href={`/questions/${q.slug}`}>
-                      <div className="atesto-card-inner atesto-stack" style={{ gap: 6 }}>
-                        <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center" }}>
-                          <strong>{q.title}</strong>
-                          <span className={q.status === "PUBLISHED" ? "atesto-badge atesto-badge-ok" : "atesto-badge"}>
-                            {q.status}
-                          </span>
-                        </div>
-                        <div className="atesto-subtle" style={{ display: "flex", justifyContent: "space-between", gap: 10 }}>
-                          <span>{q.slug}</span>
-                          <span>{readSet.has(q.slug) ? "✓ READ" : ""}</span>
-                        </div>
-                      </div>
-                    </Link>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
+            {g.topics.map((t) => renderTopic(t))}
+          </section>
         ))}
+
+        {legacyCounts.topics > 0 ? (
+          <section className="atesto-stack">
+            <div className="atesto-card">
+              <div className="atesto-card-head">
+                <h2 className="atesto-h2" style={{ margin: 0 }}>Unsorted / Legacy</h2>
+                <div className="atesto-subtle">
+                  {legacyCounts.topics} témat • {legacyCounts.total} otázek
+                </div>
+              </div>
+            </div>
+            {legacyTopics.map((t) => renderTopic(t))}
+          </section>
+        ) : null}
       </section>
     </main>
   );

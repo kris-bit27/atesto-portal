@@ -1,51 +1,51 @@
 "use client";
+
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-type NavItem = { href: string; label: string };
+type Props = {
+  adminHref: string;
+};
 
-function NavLink({ href, label }: NavItem) {
+function SbLink({ href, label, pill }: { href: string; label: string; pill?: string }) {
   const pathname = usePathname();
-  const active = pathname === href || (href !== "/" && pathname?.startsWith(href));
+  const active = pathname === href || (href !== "/" && pathname.startsWith(href));
 
   return (
-    <Link className={active ? "mn-navlink mn-navlink-active" : "mn-navlink"} href={href}>
-      {label}
+    <Link className={`mn-sb-link ${active ? "active" : ""}`} href={href}>
+      <span>{label}</span>
+      {pill ? <span className="mn-sb-pill">{pill}</span> : null}
     </Link>
   );
 }
 
-export default function Sidebar({ adminHref }: { adminHref: string }) {
-  const items: NavItem[] = [
-    { href: "/", label: "Home" },
-    { href: "/read", label: "Read" },
-    { href: "/review", label: "Review" },
-    { href: "/search", label: "Search" },
-    { href: "/editor", label: "Editor" },
-    { href: adminHref, label: "Admin" },
-  ];
-
+export default function Sidebar({ adminHref }: Props) {
   return (
     <aside className="mn-sidebar">
-      <div className="mn-brand">
-        <div className="mn-brand-title">MedNexus</div>
-        <div className="mn-brand-sub">Education • Knowledge • Tools</div>
+      <div className="mn-sb-brand">
+        <span className="dot" />
+        <div>
+          <div className="mn-sb-title">MedNexus</div>
+          <div className="mn-sb-sub">Education • Knowledge • Tools</div>
+        </div>
       </div>
 
-      <nav className="mn-nav">
-        {items.map((it) => (
-          <NavLink key={it.href} href={it.href} label={it.label} />
-        ))}
-      
+      <div className="mn-sb-section">
+        <div className="mn-sb-section-title">MedNexus</div>
+        <SbLink href="/" label="Dashboard" />
+        <SbLink href="/read" label="Read" />
+        <SbLink href="/review" label="Review" pill="SRS" />
+        <SbLink href="/search" label="Search" />
+      </div>
 
-      <div style={{ marginTop: 16 }}>
-</div>
+      <div className="mn-sb-section">
+        <div className="mn-sb-section-title">MedVerse</div>
+        <SbLink href="/editor" label="Editor" pill="AI" />
+      </div>
 
-    </nav>
-
-      <div className="mn-sidebar-footer">
-        <div className="mn-chip">MVP</div>
-        <div className="mn-muted">v2-ready</div>
+      <div className="mn-sb-section">
+        <div className="mn-sb-section-title">Admin</div>
+        <SbLink href={adminHref} label="Admin" />
       </div>
     </aside>
   );

@@ -1,6 +1,7 @@
 import prisma from "@/lib/prisma";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import ReadToggleClient from "./read-toggle-client";
 
 export const revalidate = 60;
 
@@ -61,15 +62,18 @@ export default async function QuestionPage({ params }: Params) {
               {q.title}
             </h1>
 
-            <span className={q.status === "PUBLISHED" ? "atesto-badge atesto-badge-ok" : "atesto-badge"}>
-              {q.status}
-            </span>
+            <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+              <span className={q.status === "PUBLISHED" ? "atesto-badge atesto-badge-ok" : "atesto-badge"}>
+                {q.status}
+              </span>
+              <ReadToggleClient slug={q.slug} />
+            </div>
           </div>
 
           {/* NAV (top) */}
           <div style={{ display: "flex", gap: 10, justifyContent: "space-between", flexWrap: "wrap" }}>
             <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-              {q.topic?.slug ? <NavButton href={`/topics/${q.topic.slug}`} label="← Zpět na téma" /> : <NavButton href="/" label="← Home" />}
+              {q.topic?.slug ? <NavButton href={`/topics/${q.topic.slug}`} label="← Zpět na téma" /> : <NavButton href="/" label="← Dashboard" />}
             </div>
 
             <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>

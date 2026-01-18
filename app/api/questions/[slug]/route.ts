@@ -9,14 +9,11 @@ export async function GET(_req: Request, { params }: Params) {
   const q = await prisma.question.findUnique({
     where: { slug: params.slug },
     select: {
-      id: true,
-      topicId: true,
       slug: true,
       title: true,
       status: true,
       contentHtml: true,
       updatedAt: true,
-      topic: { select: { title: true, slug: true, order: true } },
     },
   });
 
